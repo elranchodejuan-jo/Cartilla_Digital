@@ -3,7 +3,31 @@
  * Centraliza las llamadas HTTP (fetch) al backend Node.js + PostgreSQL.
  */
 
-const API_BASE_URL = 'http://localhost:3000/api';
+// Determinar la URL base del API de manera dinámica
+const getApiBaseUrl = () => {
+    const hostname = window.location.hostname;
+    
+    // Si estamos en localhost o 127.0.0.1
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:3000/api';
+    }
+    
+    // Si accedemos por la red local (ej. 192.168.x.x o similar)
+    if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(hostname)) {
+        return `http://${hostname}:3000/api`;
+    }
+    
+    // Si hay una URL personalizada guardada en localStorage (muy útil para desarrollo en móvil/producción)
+    const customApiUrl = localStorage.getItem('cartilla_digital_custom_api_url');
+    if (customApiUrl) {
+        return customApiUrl;
+    }
+    
+    // URL por defecto en producción/GitHub Pages (cámbiala si subes tu backend a internet)
+    return 'https://cartilla-digital.onrender.com/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const API = {
     // --- SESIÓN Y TOKEN ---
