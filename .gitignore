@@ -1,0 +1,19 @@
+# Dependencias de Node (no deben subirse a Git)
+node_modules/
+
+# Archivos de sistema y logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+
+# Directorios de configuración del asistente o archivos temporales
+.gemini/
+scratch/
+
+# Variables de entorno y credenciales sensibles
+.env
+.env.local
+server/.env
+server/.env.local

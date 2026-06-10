@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartilla Digital - Control Veterinario Preventivo</title>
+    <!-- Hoja de estilos del proyecto -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <!-- CABECERA PRINCIPAL (HEADER) - Oculta en Modo Público -->
+    <header class="header" role="banner">
+        <div class="logo-container" id="brand-logo" role="button" aria-label="Volver al inicio">
+            <img src="assets/logo-placeholder.png" alt="Logotipo Cartilla Digital" class="logo-img">
+            <h1 class="logo-text">Cartilla<span>Digital</span></h1>
+        </div>
+        <nav class="nav" role="navigation" aria-label="Menú principal de administración">
+            <button class="nav-btn active" data-section="inicio" aria-current="page">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">Inicio</span>
+            </button>
+            <button class="nav-btn" data-section="pacientes">
+                <span class="nav-icon">🐾</span>
+                <span class="nav-text">Pacientes</span>
+            </button>
+            <button class="nav-btn" data-section="registrarMascota">
+                <span class="nav-icon">➕</span>
+                <span class="nav-text">Registrar</span>
+            </button>
+            <button class="nav-btn" data-section="banco">
+                <span class="nav-icon">🏦</span>
+                <span class="nav-text">Banco</span>
+            </button>
+            <button class="nav-btn" data-section="configuracion">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-text">Configurar</span>
+            </button>
+            <button class="nav-btn" data-section="equipo">
+                <span class="nav-icon">🩺</span>
+                <span class="nav-text">Equipo</span>
+            </button>
+            <button class="nav-btn no-print" id="nav-btn-logout" onclick="cerrarSesionClinica()" style="color: var(--danger); display: none;">
+                <span class="nav-icon">🚪</span>
+                <span class="nav-text">Salir</span>
+            </button>
+        </nav>
+        <button id="theme-toggle" class="btn-theme-toggle no-print" aria-label="Cambiar tema">🌙</button>
+    </header>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="container" role="main">
+
+        <!-- ================= MÓDULO: LOGIN ================= -->
+        <section id="section-login" class="app-section" aria-labelledby="login-title">
+            <div class="form-card" style="max-width: 450px; margin: 40px auto; box-shadow: var(--shadow-lg);">
+                <h2 id="login-title" class="form-title" style="text-align: center;">Iniciar Sesión</h2>
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 24px;">Acceso para clínicas veterinarias</p>
+                <form id="form-login">
+                    <div class="form-group form-group-full">
+                        <label for="login-email">Correo Electrónico *</label>
+                        <input type="email" id="login-email" class="form-control" placeholder="ejemplo@veterinaria.com" required>
+                    </div>
+                    <div class="form-group form-group-full">
+                        <label for="login-password">Contraseña *</label>
+                        <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+                    </div>
+                    <div style="margin-top: 24px;">
+                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight:700;">Entrar al Panel</button>
+                    </div>
+                </form>
+                <div style="text-align: center; margin-top: 20px; font-size: 14px;">
+                    <span style="color: var(--text-muted);">¿Aún no tienes cuenta?</span>
+                    <a href="#" onclick="navegarA('registroClinica'); return false;" style="color: var(--primary); font-weight: 600; text-decoration: none; margin-left: 4px;">Regístrate aquí</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= MÓDULO: REGISTRO DE CLÍNICA ================= -->
+        <section id="section-registro-clinica" class="app-section" aria-labelledby="registro-title">
+            <div class="form-card" style="max-width: 550px; margin: 40px auto; box-shadow: var(--shadow-lg);">
+                <h2 id="registro-title" class="form-title" style="text-align: center;">Registrar Veterinaria</h2>
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 24px;">Crea una cuenta para tu clínica y empieza a emitir cartillas digitales</p>
+                <form id="form-registro-clinica">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="reg-nombre">Nombre de la Veterinaria *</label>
+                            <input type="text" id="reg-nombre" class="form-control" placeholder="Ej. Clínica Veterinaria San Francisco" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-iniciales">Iniciales (2 a 5 letras) *</label>
+                            <input type="text" id="reg-iniciales" class="form-control" placeholder="Ej. CVSF" maxlength="5" pattern="^[a-zA-Z]{2,5}$" title="Ingrese entre 2 y 5 letras sin números ni caracteres especiales" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-email">Correo Electrónico *</label>
+                            <input type="email" id="reg-email" class="form-control" placeholder="contacto@veterinaria.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-password">Contraseña *</label>
+                            <input type="password" id="reg-password" class="form-control" placeholder="Mínimo 6 caracteres" minlength="6" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-telefono">Teléfono de Contacto</label>
+                            <input type="tel" id="reg-telefono" class="form-control" placeholder="Ej. +56 9 1234 5678">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="reg-direccion">Dirección Física</label>
+                            <input type="text" id="reg-direccion" class="form-control" placeholder="Ej. Av. Condell #456, Providencia">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label id="reg-logo-label">Logotipo de la Clínica</label>
+                            <div class="photo-uploader" aria-labelledby="reg-logo-label">
+                                <span>📁 Seleccionar Logotipo</span>
+                                <input type="file" id="reg-logo-file" accept="image/*" style="opacity: 0; position: absolute; width: 100%; height: 100%; top:0; left:0; cursor:pointer;">
+                                <img id="reg-logo-preview" class="photo-preview" alt="Vista previa del logo">
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 24px;">
+                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight:700;">Crear Cuenta e Iniciar</button>
+                    </div>
+                </form>
+                <div style="text-align: center; margin-top: 20px; font-size: 14px;">
+                    <span style="color: var(--text-muted);">¿Ya tienes una cuenta?</span>
+                    <a href="#" onclick="navegarA('login'); return false;" style="color: var(--primary); font-weight: 600; text-decoration: none; margin-left: 4px;">Inicia sesión aquí</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= MÓDULO 1: INICIO (DASHBOARD) ================= -->
+        <section id="section-inicio" class="app-section active" aria-labelledby="inicio-title">
+            <div class="dashboard-title-bar">
+                <div class="welcome-box">
+                    <h1 id="inicio-title">Panel de Control</h1>
+                    <p>Resumen clínico preventivo e indicadores clave</p>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary no-print" onclick="abrirModalTransferencia()" aria-label="Recibir mascota transferida">
+                        <span>📥</span> Recibir Transferencia
+                    </button>
+                    <button class="btn btn-primary" onclick="navegarA('registrarMascota')" aria-label="Crear nuevo expediente de mascota">
+                        <span>➕</span> Registrar Mascota
+                    </button>
+                </div>
+            </div>
+
+            <!-- Panel de Estadísticas rápidas -->
+            <div class="dashboard-grid">
+                <div class="stat-card" role="button" tabindex="0" onclick="navegarA('pacientes')" aria-label="Ver todas las mascotas">
+                    <span class="stat-title">Pacientes</span>
+                    <span class="stat-number" id="stat-total">0</span>
+                </div>
+                <div class="stat-card dogs" role="button" tabindex="0" onclick="UIState.filtroEspecie='perro'; navegarA('pacientes')" aria-label="Ver perros">
+                    <span class="stat-title">Perros</span>
+                    <span class="stat-number" id="stat-perros">0</span>
+                </div>
+                <div class="stat-card cats" role="button" tabindex="0" onclick="UIState.filtroEspecie='gato'; navegarA('pacientes')" aria-label="Ver gatos">
+                    <span class="stat-title">Gatos</span>
+                    <span class="stat-number" id="stat-gatos">0</span>
+                </div>
+                <div class="stat-card vaccines" aria-label="Total de vacunas próximas o vencidas">
+                    <span class="stat-title">Vacunas Próximas</span>
+                    <span class="stat-number" id="stat-vacunas">0</span>
+                </div>
+                <div class="stat-card deworm" aria-label="Total de desparasitaciones próximas o vencidas">
+                    <span class="stat-title">Desparasitaciones</span>
+                    <span class="stat-number" id="stat-desparasitaciones">0</span>
+                </div>
+            </div>
+
+            <!-- Tabla de Próximos Eventos Clínicos -->
+            <div class="clinical-section">
+                <div class="section-header">
+                    <h2 class="section-title">🔔 Próximos Vencimientos Médicos</h2>
+                </div>
+                <div id="dashboard-proximos-eventos">
+                    <!-- Dinámico por JS -->
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🎉</div>
+                        <p>No hay alertas próximas. ¡Todos los pacientes están al día!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= MÓDULO 2: CONFIGURACIÓN DE VETERINARIA ================= -->
+        <section id="section-configuracion" class="app-section" aria-labelledby="config-title">
+            <div class="form-card">
+                <h2 id="config-title" class="form-title">Configuración de la Veterinaria</h2>
+                <form id="form-veterinaria">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="vet-nombre">Nombre de la Veterinaria *</label>
+                            <input type="text" id="vet-nombre" class="form-control" placeholder="Ej. Veterinaria San José" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="vet-iniciales">Iniciales para Código Único *</label>
+                            <input type="text" id="vet-iniciales" class="form-control" placeholder="Ej. CVSJ (2 a 5 letras)" maxlength="5" pattern="^[a-zA-Z]{2,5}$" required aria-required="true" title="Ingrese entre 2 y 5 letras sin números ni caracteres especiales">
+                        </div>
+                        <div class="form-group">
+                            <label for="vet-telefono">Teléfono de Contacto</label>
+                            <input type="tel" id="vet-telefono" class="form-control" placeholder="Ej. +56 9 1234 5678">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="vet-direccion">Dirección</label>
+                            <input type="text" id="vet-direccion" class="form-control" placeholder="Ej. Av. Principal #123, Ciudad">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label id="vet-logo-label">Logo de la Veterinaria (PNG/JPG)</label>
+                            <div class="photo-uploader" aria-labelledby="vet-logo-label">
+                                <span>📁 Subir Archivo</span>
+                                <input type="file" id="vet-logo-file" accept="image/*" style="opacity: 0; position: absolute; width: 100%; height: 100%; top:0; left:0; cursor:pointer;" aria-label="Seleccionar imagen de logo">
+                                <img id="vet-logo-preview" class="photo-preview" alt="Logotipo seleccionado">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+
+        <!-- ================= MÓDULO: BANCO CLÍNICO ================= -->
+        <section id="section-banco" class="app-section" aria-labelledby="banco-title">
+            <div class="dashboard-title-bar">
+                <div class="welcome-box">
+                    <h1 id="banco-title">🏦 Banco Clínico</h1>
+                    <p>Configura vacunas y antiparasitarios recurrentes para autocompletar</p>
+                </div>
+            </div>
+
+            <!-- Subpestañas del Banco -->
+            <div class="actions-panel" style="margin-bottom: 24px;">
+                <div class="filter-group" role="group" aria-label="Subcategorías del banco">
+                    <button class="filter-btn active" id="btn-tab-banco-vacunas" onclick="cambiarPestañaBanco('vacunas')">💉 Vacunas</button>
+                    <button class="filter-btn" id="btn-tab-banco-internos" onclick="cambiarPestañaBanco('internos')">🪱 Antiparasitarios Internos</button>
+                    <button class="filter-btn" id="btn-tab-banco-externos" onclick="cambiarPestañaBanco('externos')">🕷️ Antiparasitarios Externos</button>
+                </div>
+            </div>
+
+            <!-- Panel Contenedor de Subpestañas -->
+            <div id="banco-tabs-content">
+                <!-- Subpestaña Vacunas -->
+                <div id="banco-tab-content-vacunas" class="banco-tab-pane active">
+                    <div class="clinical-section">
+                        <div class="section-header">
+                            <h3 class="section-title">Catálogo de Vacunas</h3>
+                            <button class="btn btn-primary" onclick="abrirModalBanco('vacuna')">➕ Nueva Vacuna</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="clinic-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre Comercial</th>
+                                        <th>Tipo</th>
+                                        <th>Especie</th>
+                                        <th>Enfermedades</th>
+                                        <th>Laboratorio</th>
+                                        <th>Lote</th>
+                                        <th>Frecuencia</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="banco-vacunas-table-body">
+                                    <!-- Dinámico por JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subpestaña Internos -->
+                <div id="banco-tab-content-internos" class="banco-tab-pane">
+                    <div class="clinical-section">
+                        <div class="section-header">
+                            <h3 class="section-title">Catálogo de Antiparasitarios Internos</h3>
+                            <button class="btn btn-primary" onclick="abrirModalBanco('interno')">➕ Nuevo Producto</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="clinic-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Principio Activo</th>
+                                        <th>Especie</th>
+                                        <th>Presentación</th>
+                                        <th>Dosis</th>
+                                        <th>Vía</th>
+                                        <th>Frecuencia</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="banco-internos-table-body">
+                                    <!-- Dinámico por JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subpestaña Externos -->
+                <div id="banco-tab-content-externos" class="banco-tab-pane">
+                    <div class="clinical-section">
+                        <div class="section-header">
+                            <h3 class="section-title">Catálogo de Antiparasitarios Externos</h3>
+                            <button class="btn btn-primary" onclick="abrirModalBanco('externo')">➕ Nuevo Producto</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="clinic-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Principio Activo</th>
+                                        <th>Especie</th>
+                                        <th>Tipo</th>
+                                        <th>Rango Peso</th>
+                                        <th>Duración</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="banco-externos-table-body">
+                                    <!-- Dinámico por JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= MÓDULO: EQUIPO VETERINARIO ================= -->
+        <section id="section-equipo" class="app-section" aria-labelledby="equipo-title">
+            <div class="section-header">
+                <h2 id="equipo-title" class="section-title">Gestión de Equipo Veterinario</h2>
+                <div class="section-actions">
+                    <button class="btn btn-primary" onclick="abrirModalEquipo()">➕ Registrar Integrante</button>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Cargo</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="equipo-table-body">
+                            <!-- Los registros se llenarán con JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= MÓDULO 3: REGISTRO / EDICIÓN DE MASCOTA ================= -->
+        <section id="section-registrar-mascota" class="app-section" aria-labelledby="pet-form-title">
+            <div class="form-card">
+                <h2 id="pet-form-title" class="form-title">Registrar Nueva Mascota</h2>
+                <form id="form-mascota">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="pet-nombre">Nombre de la Mascota *</label>
+                            <input type="text" id="pet-nombre" class="form-control" placeholder="Ej. Rocco" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="pet-especie">Especie *</label>
+                            <select id="pet-especie" class="form-control" required aria-required="true">
+                                <option value="" disabled selected>Seleccione especie</option>
+                                <option value="Perro">Perro</option>
+                                <option value="Gato">Gato</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="pet-raza">Raza</label>
+                            <input type="text" id="pet-raza" class="form-control" placeholder="Ej. Golden Retriever / Mestizo" list="datalist-razas">
+                            <datalist id="datalist-razas"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="pet-sexo">Sexo</label>
+                            <select id="pet-sexo" class="form-control">
+                                <option value="Macho">Macho</option>
+                                <option value="Hembra">Hembra</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="pet-nacimiento">Fecha de Nacimiento *</label>
+                            <!-- Restricción dinámica en JS para max, pero dejamos configurado nativo -->
+                            <input type="date" id="pet-nacimiento" class="form-control" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="pet-color">Color / Pelaje</label>
+                            <input type="text" id="pet-color" class="form-control" placeholder="Ej. Albino / Negro fuego">
+                        </div>
+                        <div class="form-group">
+                            <label for="pet-peso">Peso (Kg)</label>
+                            <input type="number" id="pet-peso" class="form-control" step="0.01" min="0" placeholder="Ej. 14.5">
+                        </div>
+                        <div class="form-group">
+                            <label>Foto de la Mascota</label>
+                            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                                <button type="button" class="btn btn-secondary" onclick="document.getElementById('pet-photo-gallery').click();" style="flex:1;">📁 Galería</button>
+                                <button type="button" class="btn btn-secondary" onclick="abrirModalCamara('registro');" style="flex:1;">📷 Cámara</button>
+                            </div>
+                            <input type="file" id="pet-photo-gallery" accept="image/*" style="display: none;">
+                            <div style="position: relative; border: 1px dashed var(--border-gray); border-radius: var(--radius-md); padding: 10px; display: flex; align-items: center; justify-content: center; min-height: 120px; background-color: var(--background);">
+                                <img id="pet-photo-preview" class="photo-preview" alt="Foto seleccionada" style="max-height: 100px; max-width:100%; object-fit:contain; display: none; border-radius: var(--radius-sm);">
+                                <span id="pet-photo-placeholder" style="font-size: 12px; color: var(--text-muted);">Sin foto seleccionada</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Datos del Tutor -->
+                        <div class="form-group form-group-full" style="margin-top: 15px; border-top: 1px solid var(--border-gray); padding-top: 15px;">
+                            <h3 style="font-size: 15px; font-weight:700; color:var(--text-main);">Información del Tutor / Dueño</h3>
+                        </div>
+                        <div class="form-group">
+                            <label for="pet-tutor">Nombre del Tutor *</label>
+                            <input type="text" id="pet-tutor" class="form-control" placeholder="Ej. Carlos Valenzuela" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="pet-tutor-tel">Teléfono del Tutor</label>
+                            <input type="tel" id="pet-tutor-tel" class="form-control" placeholder="Ej. +56 9 8765 4321">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="pet-tutor-dir">Dirección del Tutor</label>
+                            <input type="text" id="pet-tutor-dir" class="form-control" placeholder="Ej. Pasaje Central #543">
+                        </div>
+                        
+                        <!-- Observaciones -->
+                        <div class="form-group form-group-full">
+                            <label for="pet-obs">Observaciones Generales</label>
+                            <textarea id="pet-obs" class="form-control" placeholder="Ej. Reacciones alérgicas leves a picaduras, posee microchip..."></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="navegarA('pacientes')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Paciente</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+
+        <!-- ================= MÓDULO 4: LISTADO DE PACIENTES ================= -->
+        <section id="section-pacientes" class="app-section" aria-labelledby="patients-title">
+            <div class="dashboard-title-bar">
+                <div class="welcome-box">
+                    <h1 id="patients-title">Pacientes Registrados</h1>
+                    <p>Filtros y buscador de historias clínicas de mascotas</p>
+                </div>
+            </div>
+
+            <div class="actions-panel">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="search-bar" class="search-input" placeholder="Buscar por código, mascota, tutor o raza..." aria-label="Buscador de pacientes">
+                </div>
+                <div class="filter-group" role="group" aria-label="Filtrar por especie">
+                    <button class="filter-btn active" data-specie="todos">Todos</button>
+                    <button class="filter-btn" data-specie="perro">Perros</button>
+                    <button class="filter-btn" data-specie="gato">Gatos</button>
+                </div>
+            </div>
+
+            <!-- Rejilla de tarjetas -->
+            <div id="patients-grid" class="patients-grid">
+                <!-- Rellenado por JS -->
+            </div>
+        </section>
+
+
+        <!-- ================= MÓDULO 5: VISTA DETALLADA DE LA CARTILLA DIGITAL ================= -->
+        <section id="section-cartilla" class="app-section" aria-labelledby="cartilla-title-tag">
+            <h1 id="cartilla-title-tag" class="no-print" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0;">Ficha de Cartilla Clínica Digital</h1>
+            
+            <!-- Barra de Acciones de la Cartilla -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+                <button id="btn-back-to-patients" class="btn btn-secondary no-print" onclick="navegarA('pacientes')" aria-label="Regresar al listado de pacientes de la clínica">
+                    <span>⬅️</span> Volver a Pacientes
+                </button>
+                <div style="display:flex; gap:8px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary no-print no-public" onclick="iniciarTransferenciaMascota()" aria-label="Iniciar transferencia de paciente">
+                        🔄 Transferir
+                    </button>
+                    <button class="btn btn-secondary no-print" onclick="copiarEnlaceCartilla()" aria-label="Copiar link público de la cartilla">
+                        🔗 Copiar Enlace
+                    </button>
+                    <button class="btn btn-secondary no-print" onclick="compartirWhatsApp()" aria-label="Compartir cartilla clínica por WhatsApp">
+                        💬 WhatsApp
+                    </button>
+                    <button class="btn btn-primary no-print" onclick="imprimirCartilla()" aria-label="Imprimir cartilla médica del paciente">
+                        🖨️ Imprimir Cartilla
+                    </button>
+                </div>
+            </div>
+
+            <!-- Encabezado Clínico de la Cartilla -->
+            <div class="clinic-card-header">
+                <div class="clinic-info-brand">
+                    <img id="cartilla-clinic-logo" src="assets/logo-placeholder.png" alt="Logotipo Veterinaria" class="clinic-logo-view">
+                    <div class="clinic-text-brand">
+                        <h2 id="cartilla-clinic-nombre">Veterinaria</h2>
+                        <p id="cartilla-clinic-contacto">Teléfono y dirección</p>
+                    </div>
+                </div>
+                <div class="cartilla-code-badge">
+                    <div class="cartilla-code-lbl">Código Ficha Digital</div>
+                    <div class="cartilla-code-num" id="cartilla-unique-code">CD-0000-00</div>
+                </div>
+            </div>
+
+            <!-- Estructura de dos columnas -->
+            <div class="cartilla-main-grid">
+                
+                <!-- Columna Lateral Izquierda (Perfil mascota/tutor/QR) -->
+                <div class="cartilla-side-col">
+                    
+                    <!-- Ficha Mascota -->
+                    <div class="cartilla-profile-card">
+                        <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+                            <img id="cartilla-pet-photo" src="assets/logo-placeholder.png" alt="Foto Paciente" class="cartilla-photo">
+                            <input type="file" id="cartilla-pet-photo-input" accept="image/*" style="display: none;" class="no-print no-public">
+                            <div class="no-print no-public" style="margin-top: 8px; width: 100%; display: flex; justify-content: center; gap: 4px;">
+                                <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px; border-radius: var(--radius-sm);" onclick="document.getElementById('cartilla-pet-photo-input').click();">📁 Galería</button>
+                                <button type="button" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px; border-radius: var(--radius-sm);" onclick="abrirModalCamara('cartilla');">📷 Cámara</button>
+                            </div>
+                        </div>
+                        <h3 id="cartilla-pet-name" class="cartilla-pet-name">Paciente</h3>
+                        <div class="cartilla-details-list">
+                            <div class="cartilla-detail-item">
+                                <span class="cartilla-detail-lbl">Especie:</span>
+                                <span class="cartilla-detail-val" id="cartilla-pet-especie">N/A</span>
+                            </div>
+                            <div class="cartilla-detail-item">
+                                <span class="cartilla-detail-lbl">Raza:</span>
+                                <span class="cartilla-detail-val" id="cartilla-pet-raza">N/A</span>
+                            </div>
+                            <div class="cartilla-detail-item">
+                                <span class="cartilla-detail-lbl">Sexo:</span>
+                                <span class="cartilla-detail-val" id="cartilla-pet-sexo">N/A</span>
+                            </div>
+                            <div class="cartilla-detail-item">
+                                <span class="cartilla-detail-lbl">Edad:</span>
+                                <span class="cartilla-detail-val" id="cartilla-pet-edad">N/A</span>
+                            </div>
+                            <div class="cartilla-detail-item">
+                                <span class="cartilla-detail-lbl">Color:</span>
+                                <span class="cartilla-detail-val" id="cartilla-pet-color">N/A</span>
+                            </div>
+                            <div class="cartilla-detail-item">
+                                <span class="cartilla-detail-lbl">Peso:</span>
+                                <span class="cartilla-detail-val" id="cartilla-pet-peso">N/A</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ficha Tutor -->
+                    <div class="tutor-card">
+                        <h4 class="tutor-card-title">👤 Datos del Tutor</h4>
+                        <div class="tutor-item">
+                            <div class="tutor-lbl">Nombre:</div>
+                            <div class="tutor-val" id="cartilla-tutor-nombre">N/A</div>
+                        </div>
+                        <div class="tutor-item">
+                            <div class="tutor-lbl">Teléfono:</div>
+                            <div class="tutor-val" id="cartilla-tutor-telefono">N/A</div>
+                        </div>
+                        <div class="tutor-item">
+                            <div class="tutor-lbl">Dirección:</div>
+                            <div class="tutor-val" id="cartilla-tutor-direccion">N/A</div>
+                        </div>
+                    </div>
+
+                    <!-- Código QR público -->
+                    <div class="qr-card">
+                        <h4 style="font-size:14px; font-weight:700; margin-bottom:12px;" class="no-print">Enlace Cartilla Digital</h4>
+                        <div id="qrcode" class="qr-box">
+                            <!-- Canvas o QRCode render -->
+                            <span class="qr-placeholder-text">Cargando QR...</span>
+                        </div>
+                        <div class="print-only" style="font-size:9px; font-weight:700; margin-top:6px; text-align:center;">Ficha Digital Verificada</div>
+                        <p style="font-size:11px; color:var(--text-muted); margin-top:8px;" class="no-print">Escanea para verificar la cartilla en tiempo real.</p>
+                    </div>
+
+                    <!-- Firma y Sello (solo para impresión) -->
+                    <div class="print-only signature-card">
+                        <div class="signature-line"></div>
+                        <div class="signature-text">Firma y Sello del Veterinario</div>
+                    </div>
+
+                </div>
+
+                <!-- Columna de Contenido Derecho (Historial clínico y médico) -->
+                <div class="cartilla-content-col">
+                    
+                    <!-- Vacunas -->
+                    <div class="clinical-section" id="cartilla-vacunas-section">
+                        <div class="section-header">
+                            <h3 class="section-title">💉 Vacunas e Inmunizaciones</h3>
+                            <button class="btn btn-secondary" onclick="abrirModal('vacuna')">➕ Agregar Vacuna</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="clinic-table">
+                                <thead>
+                                    <tr>
+                                        <th>Vacuna</th>
+                                        <th>Fecha Aplicación</th>
+                                        <th>Próxima Dosis</th>
+                                        <th>Lote</th>
+                                        <th>Veterinario</th>
+                                        <th>Obs.</th>
+                                        <th class="no-print no-public">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cartilla-vacunas-table-body">
+                                    <!-- Dinámico -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Desparasitaciones Internas -->
+                    <div class="clinical-section" id="cartilla-desparasitaciones-internas-section">
+                        <div class="section-header">
+                            <h3 class="section-title">🪱 Desparasitaciones Internas</h3>
+                            <button class="btn btn-secondary" onclick="abrirModal('desparasitacion-interna')">➕ Agregar Interna</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="clinic-table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Fecha Aplicación</th>
+                                        <th>Próxima Aplicación</th>
+                                        <th>Dosis</th>
+                                        <th>Vía</th>
+                                        <th>Veterinario</th>
+                                        <th>Obs.</th>
+                                        <th class="no-print no-public">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cartilla-desparasitaciones-internas-table-body">
+                                    <!-- Dinámico -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Control Antiparasitario Externo -->
+                    <div class="clinical-section" id="cartilla-controles-externos-section">
+                        <div class="section-header">
+                            <h3 class="section-title">🕷️ Control Antiparasitario Externo</h3>
+                            <button class="btn btn-secondary" onclick="abrirModal('control-externo')">➕ Agregar Control Externo</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="clinic-table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Tipo</th>
+                                        <th>Fecha Aplicación</th>
+                                        <th>Próxima Aplicación</th>
+                                        <th>Rango Peso</th>
+                                        <th>Parásitos Cubiertos</th>
+                                        <th>Veterinario</th>
+                                        <th>Obs.</th>
+                                        <th class="no-print no-public">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cartilla-controles-externos-table-body">
+                                    <!-- Dinámico -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Controles preventivos -->
+                    <div class="clinical-section" id="cartilla-controles-section">
+                        <div class="section-header">
+                            <h3 class="section-title">📋 Historial Clínico Preventivo</h3>
+                            <button class="btn btn-secondary" onclick="abrirModal('control')">➕ Agregar Control</button>
+                        </div>
+                        <div id="cartilla-controles-timeline" class="timeline">
+                            <!-- Dinámico -->
+                        </div>
+                    </div>
+
+                    <!-- Observaciones generales de ficha -->
+                    <div class="clinical-section" id="cartilla-observaciones-section">
+                        <div class="section-header">
+                            <h3 class="section-title">📝 Notas y Observaciones Generales</h3>
+                            <button class="btn btn-secondary no-print no-public" onclick="abrirModalObservaciones()">✏️ Editar</button>
+                        </div>
+                        <p id="cartilla-observaciones-text" style="font-size:14px; white-space:pre-line; color:var(--text-main);">
+                            Sin observaciones generales en el expediente.
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Pie de hoja clínica removido para reubicarlo en el panel lateral de impresión -->
+
+        </section>
+
+    </main>
+
+    <!-- ================= CONTENEDORES DE FORMULARIOS MODALES (POP-UPS) ================= -->
+
+    <!-- Modal Vacunación -->
+    <div id="modal-vacuna" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-vac-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-vac-title" class="modal-title">Registrar Vacuna</h3>
+                <button class="modal-close" onclick="cerrarModal('vacuna')" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-vacuna">
+                    <input type="hidden" id="vac-id">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="vac-banco-select">Seleccionar vacuna del banco (Autocompletar)</label>
+                            <select id="vac-banco-select" class="form-control" onchange="autocompletarVacunaDesdeBanco(this.value)">
+                                <option value="">-- Seleccionar para autocompletar --</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="vac-nombre">Nombre de la Vacuna *</label>
+                            <input type="text" id="vac-nombre" class="form-control" placeholder="Ej. Triple Octuple, Antirrábica, Triple Felina" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="vac-enfermedades">Enfermedades que cubre</label>
+                            <input type="text" id="vac-enfermedades" class="form-control" placeholder="Ej. Parvovirus, Rabia">
+                        </div>
+                        <div class="form-group">
+                            <label for="vac-laboratorio">Laboratorio / Marca</label>
+                            <input type="text" id="vac-laboratorio" class="form-control" placeholder="Ej. Zoetis, MSD">
+                        </div>
+                        <div class="form-group">
+                            <label for="vac-fecha">Fecha de Aplicación *</label>
+                            <input type="date" id="vac-fecha" class="form-control" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="vac-proxima">Próxima Dosis (Opcional)</label>
+                            <input type="date" id="vac-proxima" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="vac-lote">Número de Lote</label>
+                            <input type="text" id="vac-lote" class="form-control" placeholder="Ej. L-1234">
+                        </div>
+                        <div class="form-group">
+                            <label for="vac-responsable">Veterinario Responsable *</label>
+                            <select id="vac-responsable" class="form-control" required aria-required="true">
+                                <option value="">Seleccione un responsable</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="vac-obs">Observaciones específicas</label>
+                            <input type="text" id="vac-obs" class="form-control" placeholder="Ej. Paciente cooperó muy bien.">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModal('vacuna')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Registrar Vacuna</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Desparasitación Interna -->
+    <div id="modal-desparasitacion-interna" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-des-int-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-des-int-title" class="modal-title">Registrar Desparasitación Interna</h3>
+                <button class="modal-close" onclick="cerrarModal('desparasitacion-interna')" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-desparasitacion-interna">
+                    <input type="hidden" id="des-int-id">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="des-int-banco-select">Seleccionar del banco (Autocompletar)</label>
+                            <select id="des-int-banco-select" class="form-control" onchange="autocompletarInternoDesdeBanco(this.value)">
+                                <option value="">-- Seleccionar para autocompletar --</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="des-int-producto">Nombre del Producto *</label>
+                            <input type="text" id="des-int-producto" class="form-control" placeholder="Ej. Albendazol, Drontal" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="des-int-fecha">Fecha de Aplicación *</label>
+                            <input type="date" id="des-int-fecha" class="form-control" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="des-int-proxima">Próxima Aplicación (Opcional)</label>
+                            <input type="date" id="des-int-proxima" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="des-int-dosis">Dosis</label>
+                            <input type="text" id="des-int-dosis" class="form-control" placeholder="Ej. 1 tableta / 2.5 ml">
+                        </div>
+                        <div class="form-group">
+                            <label for="des-int-via">Vía de Administración</label>
+                            <select id="des-int-via" class="form-control">
+                                <option value="Oral">Oral</option>
+                                <option value="Pasta">Pasta</option>
+                                <option value="Inyectable">Inyectable</option>
+                                <option value="Otra">Otra</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="des-int-responsable">Veterinario Responsable *</label>
+                            <select id="des-int-responsable" class="form-control" required aria-required="true">
+                                <option value="">Seleccione un responsable</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="des-int-obs">Observaciones</label>
+                            <input type="text" id="des-int-obs" class="form-control" placeholder="Ej. Control de nematodos.">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModal('desparasitacion-interna')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Registrar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Control Antiparasitario Externo -->
+    <div id="modal-control-externo" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-ctrl-ext-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-ctrl-ext-title" class="modal-title">Registrar Control Antiparasitario Externo</h3>
+                <button class="modal-close" onclick="cerrarModal('control-externo')" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-control-externo">
+                    <input type="hidden" id="des-ext-id">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="des-ext-banco-select">Seleccionar del banco (Autocompletar)</label>
+                            <select id="des-ext-banco-select" class="form-control" onchange="autocompletarExternoDesdeBanco(this.value)">
+                                <option value="">-- Seleccionar para autocompletar --</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="des-ext-producto">Nombre del Producto *</label>
+                            <input type="text" id="des-ext-producto" class="form-control" placeholder="Ej. NexGard, Bravecto" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="des-ext-tipo">Tipo de Producto</label>
+                            <select id="des-ext-tipo" class="form-control">
+                                <option value="Tableta">Tableta</option>
+                                <option value="Pipeta">Pipeta</option>
+                                <option value="Collar">Collar</option>
+                                <option value="Spray">Spray</option>
+                                <option value="Shampoo">Shampoo</option>
+                                <option value="Inyectable">Inyectable</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="des-ext-peso">Rango de Peso</label>
+                            <input type="text" id="des-ext-peso" class="form-control" placeholder="Ej. 10-25 Kg">
+                        </div>
+                        <div class="form-group">
+                            <label for="des-ext-fecha">Fecha de Aplicación *</label>
+                            <input type="date" id="des-ext-fecha" class="form-control" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="des-ext-proxima">Próxima Aplicación (Opcional)</label>
+                            <input type="date" id="des-ext-proxima" class="form-control">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="des-ext-parasitos">Parásitos que cubre</label>
+                            <input type="text" id="des-ext-parasitos" class="form-control" placeholder="Ej. Pulgas, garrapatas, ácaros">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="des-ext-responsable">Veterinario Responsable *</label>
+                            <select id="des-ext-responsable" class="form-control" required aria-required="true">
+                                <option value="">Seleccione un responsable</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="des-ext-obs">Observaciones</label>
+                            <input type="text" id="des-ext-obs" class="form-control" placeholder="Ej. Aplicado correctamente.">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModal('control-externo')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Registrar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Controles Clínicos -->
+    <div id="modal-control" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-ctrl-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-ctrl-title" class="modal-title">Registrar Control Preventivo</h3>
+                <button class="modal-close" onclick="cerrarModal('control')" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-control">
+                    <input type="hidden" id="ctrl-id">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="ctrl-fecha">Fecha del Control *</label>
+                            <input type="date" id="ctrl-fecha" class="form-control" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="ctrl-motivo">Motivo de la Consulta *</label>
+                            <input type="text" id="ctrl-motivo" class="form-control" placeholder="Ej. Control sano, Vacunación, Alergia" required aria-required="true">
+                        </div>
+                        <div class="form-group">
+                            <label for="ctrl-peso">Peso (Kg)</label>
+                            <input type="number" id="ctrl-peso" class="form-control" step="0.01" min="0" placeholder="Ej. 18.2">
+                        </div>
+                        <div class="form-group">
+                            <label for="ctrl-temp">Temperatura (°C)</label>
+                            <input type="number" id="ctrl-temp" class="form-control" step="0.1" min="20" max="50" placeholder="Ej. 38.5">
+                        </div>
+                        <div class="form-group">
+                            <label for="ctrl-fc">Frecuencia Cardiaca (lpm)</label>
+                            <input type="number" id="ctrl-fc" class="form-control" min="0" placeholder="Ej. 120">
+                        </div>
+                        <div class="form-group">
+                            <label for="ctrl-fr">Frecuencia Respiratoria (rpm)</label>
+                            <input type="number" id="ctrl-fr" class="form-control" min="0" placeholder="Ej. 28">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="ctrl-hallazgos">Examen Físico / Hallazgos</label>
+                            <textarea id="ctrl-hallazgos" class="form-control" placeholder="Ej. Oídos limpios, dentadura sana, pelaje brilloso..."></textarea>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="ctrl-diag">Diagnóstico Presuntivo</label>
+                            <input type="text" id="ctrl-diag" class="form-control" placeholder="Ej. Paciente sano.">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="ctrl-tratamiento">Tratamiento Administrado</label>
+                            <input type="text" id="ctrl-tratamiento" class="form-control" placeholder="Ej. Limpieza profiláctica básica.">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="ctrl-rec">Recomendaciones e Indicaciones</label>
+                            <textarea id="ctrl-rec" class="form-control" placeholder="Ej. Controlar cepillado dental 2 veces por semana."></textarea>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="ctrl-proximo">Fecha de Próximo Control (Opcional)</label>
+                            <input type="date" id="ctrl-proximo" class="form-control">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="ctrl-responsable">Veterinario Responsable *</label>
+                            <select id="ctrl-responsable" class="form-control" required aria-required="true">
+                                <option value="">Seleccione un responsable</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModal('control')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Registrar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Equipo Veterinario -->
+    <div id="modal-equipo" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-equipo-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-equipo-title" class="modal-title">Registrar Responsable</h3>
+                <button class="modal-close" onclick="cerrarModalEquipo()" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-equipo">
+                    <input type="hidden" id="eq-id">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="eq-nombre">Nombre Completo *</label>
+                            <input type="text" id="eq-nombre" class="form-control" placeholder="Ej. Dr. Carlos Soto" required>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="eq-cargo">Cargo / Especialidad *</label>
+                            <input type="text" id="eq-cargo" class="form-control" placeholder="Ej. Médico Veterinario" required>
+                        </div>
+                        <div class="form-group form-group-full" id="eq-estado-group" style="display:none;">
+                            <label for="eq-estado">Estado</label>
+                            <select id="eq-estado" class="form-control">
+                                <option value="activo">Activo</option>
+                                <option value="inactivo">Inactivo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModalEquipo()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Observaciones Generales (Paciente) -->
+    <div id="modal-observaciones" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-obs-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-obs-title" class="modal-title">Editar Notas y Observaciones</h3>
+                <button class="modal-close" onclick="cerrarModal('observaciones')" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-observaciones">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="obs-generales-text">Notas y Observaciones Clínicas del Animal</label>
+                            <textarea id="obs-generales-text" class="form-control" placeholder="Ej. Reacciones alérgicas leves a picaduras, posee microchip..." style="min-height: 150px;"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModal('observaciones')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Observaciones</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Banco Vacuna -->
+    <div id="modal-banco-vacuna" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-banco-vac-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-banco-vac-title" class="modal-title">Guardar Vacuna en Banco</h3>
+                <button class="modal-close" onclick="cerrarModalBanco('vacuna')" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-banco-vacuna">
+                    <input type="hidden" id="banco-vac-id">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="banco-vac-nombre">Nombre Comercial *</label>
+                            <input type="text" id="banco-vac-nombre" class="form-control" placeholder="Ej. Sextuple Canina" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-vac-tipo">Tipo de Vacuna</label>
+                            <input type="text" id="banco-vac-tipo" class="form-control" placeholder="Ej. Atenuada, Inactivada">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-vac-especie">Especie Recomendada *</label>
+                            <select id="banco-vac-especie" class="form-control" required>
+                                <option value="Perro">Perro</option>
+                                <option value="Gato">Gato</option>
+                                <option value="Ambos">Ambos</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="banco-vac-enfermedades">Enfermedades que cubre *</label>
+                            <input type="text" id="banco-vac-enfermedades" class="form-control" placeholder="Ej. Parvovirus, Distemper, Leptospira" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-vac-laboratorio">Laboratorio / Marca</label>
+                            <input type="text" id="banco-vac-laboratorio" class="form-control" placeholder="Ej. Zoetis">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-vac-lote">Lote Predeterminado</label>
+                            <input type="text" id="banco-vac-lote" class="form-control" placeholder="Ej. SX-202B">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-vac-frecuencia">Frecuencia / Duración</label>
+                            <input type="text" id="banco-vac-frecuencia" class="form-control" placeholder="Ej. Anual, Cada 3 años">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="banco-vac-obs">Observaciones</label>
+                            <input type="text" id="banco-vac-obs" class="form-control" placeholder="Ej. Mantener refrigerado.">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModalBanco('vacuna')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar en Banco</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Banco Antiparasitario Interno -->
+    <div id="modal-banco-interno" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-banco-int-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-banco-int-title" class="modal-title">Guardar Antiparasitario Interno en Banco</h3>
+                <button class="modal-close" onclick="cerrarModalBanco('interno')" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-banco-interno">
+                    <input type="hidden" id="banco-int-id">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="banco-int-nombre">Nombre Comercial *</label>
+                            <input type="text" id="banco-int-nombre" class="form-control" placeholder="Ej. Drontal Puppy" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-int-principio">Principio Activo</label>
+                            <input type="text" id="banco-int-principio" class="form-control" placeholder="Ej. Pirantel + Praziquantel">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-int-especie">Especie Recomendada *</label>
+                            <select id="banco-int-especie" class="form-control" required>
+                                <option value="Perro">Perro</option>
+                                <option value="Gato">Gato</option>
+                                <option value="Ambos">Ambos</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-int-presentacion">Presentación</label>
+                            <select id="banco-int-presentacion" class="form-control">
+                                <option value="tableta">Tableta</option>
+                                <option value="suspensión">Suspensión</option>
+                                <option value="pipeta">Pipeta</option>
+                                <option value="inyectable">Inyectable</option>
+                                <option value="pasta">Pasta</option>
+                                <option value="otra">Otra</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-int-dosis">Dosis Recomendada</label>
+                            <input type="text" id="banco-int-dosis" class="form-control" placeholder="Ej. 1 ml por cada kg">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-int-peso">Rango de Peso</label>
+                            <input type="text" id="banco-int-peso" class="form-control" placeholder="Ej. Hasta 5 kg">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-int-via">Vía de Administración</label>
+                            <input type="text" id="banco-int-via" class="form-control" placeholder="Ej. Oral, Subcutánea">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-int-frecuencia">Frecuencia Recomendada</label>
+                            <input type="text" id="banco-int-frecuencia" class="form-control" placeholder="Ej. Cada 3 meses">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="banco-int-parasitos">Parásitos que cubre</label>
+                            <input type="text" id="banco-int-parasitos" class="form-control" placeholder="Ej. Nematodos, Giardia">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-int-laboratorio">Laboratorio / Marca</label>
+                            <input type="text" id="banco-int-laboratorio" class="form-control" placeholder="Ej. Bayer">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-int-lote">Lote Predeterminado</label>
+                            <input type="text" id="banco-int-lote" class="form-control" placeholder="Ej. LT-883">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="banco-int-obs">Observaciones</label>
+                            <input type="text" id="banco-int-obs" class="form-control" placeholder="Ej. Cuidado MDR1 en Collies.">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModalBanco('interno')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar en Banco</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Banco Antiparasitario Externo -->
+    <div id="modal-banco-externo" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-banco-ext-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-banco-ext-title" class="modal-title">Guardar Antiparasitario Externo en Banco</h3>
+                <button class="modal-close" onclick="cerrarModalBanco('externo')" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-banco-externo">
+                    <input type="hidden" id="banco-ext-id">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="banco-ext-nombre">Nombre Comercial *</label>
+                            <input type="text" id="banco-ext-nombre" class="form-control" placeholder="Ej. Bravecto Perros" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-ext-principio">Principio Activo</label>
+                            <input type="text" id="banco-ext-principio" class="form-control" placeholder="Ej. Fluralaner">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-ext-especie">Especie Recomendada *</label>
+                            <select id="banco-ext-especie" class="form-control" required>
+                                <option value="Perro">Perro</option>
+                                <option value="Gato">Gato</option>
+                                <option value="Ambos">Ambos</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-ext-tipo">Tipo de Producto</label>
+                            <select id="banco-ext-tipo" class="form-control">
+                                <option value="Tableta">Tableta</option>
+                                <option value="Pipeta">Pipeta</option>
+                                <option value="Collar">Collar</option>
+                                <option value="Spray">Spray</option>
+                                <option value="Shampoo">Shampoo</option>
+                                <option value="Inyectable">Inyectable</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-ext-peso">Rango de Peso</label>
+                            <input type="text" id="banco-ext-peso" class="form-control" placeholder="Ej. 10 - 20 kg">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-ext-duracion">Duración de Protección</label>
+                            <input type="text" id="banco-ext-duracion" class="form-control" placeholder="Ej. 12 semanas">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-ext-frecuencia">Frecuencia Recomendada</label>
+                            <input type="text" id="banco-ext-frecuencia" class="form-control" placeholder="Ej. Cada 12 semanas">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="banco-ext-parasitos">Parásitos que cubre</label>
+                            <input type="text" id="banco-ext-parasitos" class="form-control" placeholder="Ej. Pulgas, garrapatas, ácaros">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-ext-laboratorio">Laboratorio / Marca</label>
+                            <input type="text" id="banco-ext-laboratorio" class="form-control" placeholder="Ej. MSD Animal Health">
+                        </div>
+                        <div class="form-group">
+                            <label for="banco-ext-lote">Lote Predeterminado</label>
+                            <input type="text" id="banco-ext-lote" class="form-control" placeholder="Ej. L-998">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="banco-ext-obs">Observaciones</label>
+                            <input type="text" id="banco-ext-obs" class="form-control" placeholder="Ej. Dar junto con el alimento.">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="banco-ext-advertencias">Advertencias</label>
+                            <input type="text" id="banco-ext-advertencias" class="form-control" placeholder="Ej. No usar en cachorros < 8 semanas.">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModalBanco('externo')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar en Banco</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Recibir Transferencia -->
+    <div id="modal-transferencia-recibir" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-tx-rec-title">
+        <div class="modal-content" style="max-width: 400px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);">
+            <div class="modal-header">
+                <h3 id="modal-tx-rec-title" class="modal-title">Recibir Paciente</h3>
+                <button class="modal-close" onclick="cerrarModal('transferencia-recibir')" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-transferencia-recibir">
+                    <div class="form-grid">
+                        <div class="form-group form-group-full" style="margin-bottom: 0;">
+                            <label for="tx-codigo-input">Código de Transferencia *</label>
+                            <input type="text" id="tx-codigo-input" class="form-control" placeholder="Ej. TX-A1B2C3" required style="text-align: center; font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; height: 50px; border-color: var(--primary);">
+                            <small style="color: var(--text-muted); display: block; margin-top: 10px; text-align: center; line-height: 1.4;">Ingresa el código temporal de 6 caracteres generado por la clínica de origen.</small>
+                        </div>
+                    </div>
+                    <div class="form-actions" style="margin-top: 24px;">
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModal('transferencia-recibir')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Reclamar Paciente</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Iniciar Transferencia -->
+    <div id="modal-transferencia-iniciar" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-tx-init-title">
+        <div class="modal-content" style="max-width: 400px; text-align: center; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);">
+            <div class="modal-header" style="justify-content: center; position: relative;">
+                <h3 id="modal-tx-init-title" class="modal-title">Código de Transferencia</h3>
+                <button class="modal-close" onclick="cerrarModal('transferencia-iniciar')" aria-label="Cerrar modal" style="position: absolute; right: 16px;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding-top: 16px;">
+                <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5;">Comparte este código temporal con la clínica de destino para transferir el expediente completo:</p>
+                <div id="tx-codigo-display" style="font-size: 32px; font-weight: 800; color: var(--primary); background: var(--background); border: 2px dashed var(--primary); border-radius: var(--radius-md); padding: 15px; letter-spacing: 2px; margin-bottom: 12px; font-family: monospace;">TX-XXXXXX</div>
+                <p style="font-size: 12.5px; color: var(--danger); font-weight: 600;">* Este código expirará en 24 horas.</p>
+                <div class="form-actions" style="margin-top: 28px; justify-content: center;">
+                    <button type="button" class="btn btn-primary" onclick="cerrarModal('transferencia-iniciar')" style="min-width: 120px;">Entendido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cámara WebRTC -->
+    <div id="modal-camara" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-camara-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-camara-title" class="modal-title">Tomar Foto</h3>
+                <button class="modal-close" onclick="cerrarModalCamara()" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                <div style="position: relative; width: 100%; max-width: 400px; background: #000; border-radius: var(--radius-md); overflow: hidden; display: flex; align-items: center; justify-content: center; aspect-ratio: 1/1;">
+                    <video id="camara-video" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
+                    <canvas id="camara-canvas" style="display: none;"></canvas>
+                </div>
+                <div style="display: flex; gap: 10px; width: 100%; max-width: 400px;">
+                    <button type="button" class="btn btn-secondary" onclick="cambiarCamara()" style="flex: 1;">🔄 Girar</button>
+                    <button type="button" class="btn btn-primary" onclick="capturarFotoCamara()" style="flex: 2;">📸 Capturar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor para Notificaciones Flotantes -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <!-- Librerías Externas (qrcodejs CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <!-- Scripts del Proyecto en Orden de Dependencia -->
+    <script src="js/api.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/codigo.js"></script>
+    <script src="js/razas.js"></script>
+    <script src="js/fotos.js"></script>
+    <script src="js/mascotas.js"></script>
+    <script src="js/vacunas.js"></script>
+    <script src="js/desparasitaciones.js"></script>
+    <script src="js/controles.js"></script>
+    <script src="js/banco.js"></script>
+    <script src="js/equipo.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

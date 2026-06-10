@@ -1,0 +1,309 @@
+/**
+ * CARTILLA DIGITAL - Módulo de Comunicación con API (api.js)
+ * Centraliza las llamadas HTTP (fetch) al backend Node.js + PostgreSQL.
+ */
+
+const API_BASE_URL = 'http://localhost:3000/api';
+
+const API = {
+    // --- SESIÓN Y TOKEN ---
+    getToken() {
+        return localStorage.getItem('cartilla_digital_token');
+    },
+
+    setToken(token) {
+        if (token) {
+            localStorage.setItem('cartilla_digital_token', token);
+        } else {
+            localStorage.removeItem('cartilla_digital_token');
+        }
+    },
+
+    setSessionVet(vet) {
+        if (vet) {
+            localStorage.setItem('cartilla_digital_session_vet', JSON.stringify(vet));
+        } else {
+            localStorage.removeItem('cartilla_digital_session_vet');
+        }
+    },
+
+    getSessionVet() {
+        try {
+            const data = localStorage.getItem('cartilla_digital_session_vet');
+            return data ? JSON.parse(data) : null;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    isLoggedIn() {
+        return !!this.getToken();
+    },
+
+    logout() {
+        this.setToken(null);
+        this.setSessionVet(null);
+        // Limpiar caché local si existiera
+        localStorage.removeItem('cartilla_digital_veterinaria');
+        localStorage.removeItem('cartilla_digital_mascotas');
+    },
+
+    // --- CABECERAS ---
+    getHeaders(requireAuth = true) {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        if (requireAuth) {
+            const token = this.getToken();
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+        }
+        return headers;
+    },
+
+    // --- LLAMADAS BASE ---
+    async handleResponse(response) {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            // Si el token es inválido/expirado, forzar deslogueo
+            if (response.status === 401 || response.status === 403) {
+                this.logout();
+                window.location.reload();
+            }
+            throw new Error(data.error || 'Ocurrió un error en el servidor.');
+        }
+        return data;
+    },
+
+    // --- AUTENTICACIÓN ---
+    async login(email, password) {
+        const res = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: this.getHeaders(false),
+            body: JSON.stringify({ email, password })
+        });
+        const data = await this.handleResponse(res);
+        this.setToken(data.token);
+        this.setSessionVet(data.veterinaria);
+        return data;
+    },
+
+    async register(datos) {
+        const res = await fetch(`${API_BASE_URL}/auth/register`, {
+            method: 'POST',
+            headers: this.getHeaders(false),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    // --- PERFIL VETERINARIA ---
+    async obtenerVeterinaria() {
+        const res = await fetch(`${API_BASE_URL}/veterinaria`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async actualizarVeterinaria(datos) {
+        const res = await fetch(`${API_BASE_URL}/veterinaria`, {
+            method: 'PUT',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        const data = await this.handleResponse(res);
+        if (data.veterinaria) {
+            this.setSessionVet(data.veterinaria);
+        }
+        return data;
+    },
+
+    // --- EQUIPO VETERINARIO ---
+    async obtenerEquipo() {
+        const res = await fetch(`${API_BASE_URL}/equipo`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async guardarResponsableEquipo(datos) {
+        const res = await fetch(`${API_BASE_URL}/equipo`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async editarResponsableEquipo(id, datos) {
+        const res = await fetch(`${API_BASE_URL}/equipo/${id}`, {
+            method: 'PUT',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async eliminarResponsableEquipo(id) {
+        const res = await fetch(`${API_BASE_URL}/equipo/${id}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    // --- MASCOTAS ---
+    async obtenerMascotas() {
+        const res = await fetch(`${API_BASE_URL}/mascotas`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async registrarMascota(datos) {
+        const res = await fetch(`${API_BASE_URL}/mascotas`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async obtenerMascotaDetalle(id) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${id}`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async editarMascota(id, datos) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${id}`, {
+            method: 'PUT',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async eliminarMascota(id) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${id}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    // --- HISTORIAL CLÍNICO: VACUNAS ---
+    async guardarVacuna(mascotaId, datos) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/vacunas`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async editarVacuna(mascotaId, vacunaId, datos) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/vacunas/${vacunaId}`, {
+            method: 'PUT',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async eliminarVacuna(mascotaId, vacunaId) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/vacunas/${vacunaId}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    // --- HISTORIAL CLÍNICO: DESPARASITACIONES ---
+    async guardarDesparasitacion(mascotaId, datos) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/desparasitaciones`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async editarDesparasitacion(mascotaId, desparasitacionId, datos) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/desparasitaciones/${desparasitacionId}`, {
+            method: 'PUT',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async eliminarDesparasitacion(mascotaId, desparasitacionId) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/desparasitaciones/${desparasitacionId}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    // --- HISTORIAL CLÍNICO: CONTROLES ---
+    async guardarControl(mascotaId, datos) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/controles`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async editarControl(mascotaId, controlId, datos) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/controles/${controlId}`, {
+            method: 'PUT',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async eliminarControl(mascotaId, controlId) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/controles/${controlId}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    // --- TRANSFERENCIA DE PACIENTES ---
+    async iniciarTransferencia(mascotaId) {
+        const res = await fetch(`${API_BASE_URL}/transferencias/iniciar`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ mascotaId })
+        });
+        return this.handleResponse(res);
+    },
+
+    async completarTransferencia(codigo) {
+        const res = await fetch(`${API_BASE_URL}/transferencias/completar`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ codigo })
+        });
+        return this.handleResponse(res);
+    },
+
+    // --- RUTA PÚBLICA (QR) ---
+    async obtenerMascotaPublica(id) {
+        const res = await fetch(`${API_BASE_URL}/public/mascotas/${id}`, {
+            method: 'GET',
+            headers: this.getHeaders(false) // No requiere JWT
+        });
+        return this.handleResponse(res);
+    }
+};

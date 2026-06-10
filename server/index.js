@@ -1,0 +1,1173 @@
+const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const db = require('./db');
+const authMiddleware = require('./authMiddleware');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Configurar CORS y límites de carga para imágenes Base64 grandes
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// --- RUTAS DE AUTENTICACIÓN ---
+
+/**
+ * Registro de nueva clínica veterinaria
+ */
+app.post('/api/auth/register', async (req, res) => {
+    const { email, password, nombre, iniciales, telefono, direccion, logo } = req.body;
+    
+    if (!email || !password || !nombre || !iniciales) {
+        return res.status(400).json({ error: 'Faltan campos requeridos (email, contraseña, nombre, iniciales).' });
+    }
+    
+    const inicialesUpper = iniciales.trim().toUpperCase();
+    if (inicialesUpper.length < 2 || inicialesUpper.length > 5) {
+        return res.status(400).json({ error: 'Las iniciales deben tener entre 2 y 5 caracteres.' });
+    }
+    
+    try {
+        // Encriptar contraseña
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+        
+        const queryText = `
+            INSERT INTO veterinarias (email, password_hash, nombre, iniciales, telefono, direccion, logo_base64)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, email, nombre, iniciales
+        `;
+        const values = [email.trim().toLowerCase(), passwordHash, nombre.trim(), inicialesUpper, telefono, direccion, logo];
+        
+        const result = await db.query(queryText, values);
+        const vetId = result.rows[0].id;
+        
+        // Agregar al dueño como médico principal automático
+        await db.query(
+            `INSERT INTO equipo_veterinario (veterinaria_id, nombre, cargo, es_principal) VALUES ($1, $2, $3, $4)`,
+            [vetId, nombre.trim(), 'Médico Veterinario Principal', true]
+        );
+        
+        res.status(201).json({ mensaje: 'Clínica registrada con éxito.', veterinaria: result.rows[0] });
+    } catch (err) {
+        if (err.code === '23505') { // Violación de unicidad en PostgreSQL
+            if (err.detail.includes('email')) {
+                return res.status(400).json({ error: 'El correo electrónico ya está registrado.' });
+            }
+            if (err.detail.includes('iniciales')) {
+                return res.status(400).json({ error: 'Las iniciales ya están en uso por otra clínica.' });
+            }
+        }
+        console.error('Error al registrar clínica:', err);
+        res.status(500).json({ error: 'Error interno del servidor al procesar el registro.' });
+    }
+});
+
+/**
+ * Inicio de sesión de clínica veterinaria
+ */
+app.post('/api/auth/login', async (req, res) => {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Correo y contraseña requeridos.' });
+    }
+    
+    try {
+        const queryText = 'SELECT * FROM veterinarias WHERE email = $1';
+        const result = await db.query(queryText, [email.trim().toLowerCase()]);
+        
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'Credenciales inválidas.' });
+        }
+        
+        const vet = result.rows[0];
+        
+        // Verificar contraseña
+        const passwordCorrect = await bcrypt.compare(password, vet.password_hash);
+        if (!passwordCorrect) {
+            return res.status(401).json({ error: 'Credenciales inválidas.' });
+        }
+        
+        // Generar JWT
+        const token = jwt.sign(
+            { id: vet.id, email: vet.email, nombre: vet.nombre, iniciales: vet.iniciales },
+            process.env.JWT_SECRET,
+            { expiresIn: '30d' } // Token válido por 30 días
+        );
+        
+        res.json({
+            token,
+            veterinaria: {
+                id: vet.id,
+                email: vet.email,
+                nombre: vet.nombre,
+                iniciales: vet.iniciales,
+                telefono: vet.telefono,
+                direccion: vet.direccion,
+                logo: vet.logo_base64
+            }
+        });
+    } catch (err) {
+        console.error('Error en login:', err);
+        res.status(500).json({ error: 'Error interno del servidor.' });
+    }
+});
+
+// --- PERFIL DE VETERINARIA ---
+
+app.get('/api/veterinaria', authMiddleware, async (req, res) => {
+    try {
+        const result = await db.query('SELECT id, email, nombre, iniciales, telefono, direccion, logo_base64 AS logo FROM veterinarias WHERE id = $1', [req.veterinaria.id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Clínica no encontrada.' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error interno del servidor.' });
+    }
+});
+
+app.put('/api/veterinaria', authMiddleware, async (req, res) => {
+    const { nombre, telefono, direccion, logo } = req.body;
+    
+    if (!nombre) {
+        return res.status(400).json({ error: 'El nombre es obligatorio.' });
+    }
+    
+    try {
+        const queryText = `
+            UPDATE veterinarias
+            SET nombre = $1, telefono = $2, direccion = $3, logo_base64 = $4
+            WHERE id = $5
+            RETURNING id, email, nombre, iniciales, telefono, direccion, logo_base64 AS logo
+        `;
+        const values = [nombre.trim(), telefono, direccion, logo, req.veterinaria.id];
+        const result = await db.query(queryText, values);
+        
+        res.json({ mensaje: 'Perfil actualizado con éxito.', veterinaria: result.rows[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar perfil.' });
+    }
+});
+
+
+// --- RUTAS DE MASCOTAS ---
+
+/**
+ * Obtener listado de mascotas de la veterinaria autenticada
+ */
+app.get('/api/mascotas', authMiddleware, async (req, res) => {
+    try {
+        const queryText = `
+            SELECT m.*, 
+                   COALESCE(m.foto_base64, '') AS foto
+            FROM mascotas m
+            WHERE m.veterinaria_id = $1
+            ORDER BY m.fecha_registro DESC
+        `;
+        const result = await db.query(queryText, [req.veterinaria.id]);
+        
+        // Obtener todas las vacunas y desparasitaciones de las mascotas de esta veterinaria
+        const mascotaIds = result.rows.map(r => r.id);
+        
+        let vacunasMap = {};
+        let desparasitacionesMap = {};
+        
+        if (mascotaIds.length > 0) {
+            const vacRes = await db.query(
+                'SELECT * FROM vacunas WHERE mascota_id = ANY($1) ORDER BY fecha_aplicacion DESC',
+                [mascotaIds]
+            );
+            vacRes.rows.forEach(v => {
+                if (!vacunasMap[v.mascota_id]) vacunasMap[v.mascota_id] = [];
+                vacunasMap[v.mascota_id].push({
+                    id: v.id,
+                    nombre: v.nombre,
+                    enfermedades: v.enfermedades || '',
+                    laboratorio: v.laboratorio || '',
+                    fechaAplicacion: v.fecha_aplicacion.toISOString().split('T')[0],
+                    proximaDosis: v.proxima_dosis ? v.proxima_dosis.toISOString().split('T')[0] : '',
+                    lote: v.lote || '',
+                    responsable: v.responsable,
+                    observaciones: v.observaciones || ''
+                });
+            });
+            
+            const desRes = await db.query(
+                'SELECT * FROM desparasitaciones WHERE mascota_id = ANY($1) ORDER BY fecha_aplicacion DESC',
+                [mascotaIds]
+            );
+            desRes.rows.forEach(d => {
+                if (!desparasitacionesMap[d.mascota_id]) desparasitacionesMap[d.mascota_id] = [];
+                desparasitacionesMap[d.mascota_id].push({
+                    id: d.id,
+                    tipo: d.tipo,
+                    producto: d.producto,
+                    tipoProducto: d.tipo_producto || 'tableta',
+                    rangoPeso: d.rango_peso || '',
+                    parasitosCubre: d.parasitos_cubre || '',
+                    fechaAplicacion: d.fecha_aplicacion.toISOString().split('T')[0],
+                    proximaAplicacion: d.proxima_aplicacion ? d.proxima_aplicacion.toISOString().split('T')[0] : '',
+                    dosis: d.dosis || '',
+                    via: d.via || 'Oral',
+                    responsable: d.responsable,
+                    observaciones: d.observaciones || ''
+                });
+            });
+        }
+        
+        const mascotasFormateadas = result.rows.map(row => ({
+            id: row.id,
+            codigo: row.codigo,
+            fechaRegistro: row.fecha_registro.toISOString().split('T')[0],
+            veterinariaIniciales: row.veterinaria_iniciales,
+            nombre: row.nombre,
+            especie: row.especie,
+            raza: row.raza || '',
+            sexo: row.sexo,
+            fechaNacimiento: row.fecha_nacimiento.toISOString().split('T')[0],
+            color: row.color || '',
+            peso: row.peso || '',
+            foto: row.foto || '',
+            tutor: {
+                nombre: row.tutor_nombre || 'Sin Tutor',
+                telefono: row.tutor_telefono || '',
+                direccion: row.tutor_direccion || ''
+            },
+            observaciones: row.observaciones || '',
+            vacunas: vacunasMap[row.id] || [],
+            desparasitaciones: desparasitacionesMap[row.id] || []
+        }));
+        
+        res.json(mascotasFormateadas);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al obtener mascotas.' });
+    }
+});
+
+// Helper para generar el código de paciente en el backend
+function formatearFechaAAMMDD(date) {
+    const y = String(date.getFullYear()).slice(-2);
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}${m}${d}`;
+}
+
+/**
+ * Registrar mascota (paciente)
+ */
+app.post('/api/mascotas', authMiddleware, async (req, res) => {
+    const { nombre, especie, raza, sexo, fechaNacimiento, color, peso, foto, tutor, observaciones } = req.body;
+    
+    if (!nombre || !especie || !fechaNacimiento || !tutor?.nombre) {
+        return res.status(400).json({ error: 'Nombre, especie, fecha de nacimiento y tutor son obligatorios.' });
+    }
+    
+    try {
+        const hoy = new Date();
+        
+        // 1. Contar pacientes de hoy de esta misma clínica y especie para el correlativo
+        const countQuery = `
+            SELECT COUNT(*) 
+            FROM mascotas 
+            WHERE veterinaria_id = $1 
+              AND LOWER(especie) = LOWER($2) 
+              AND fecha_registro::date = CURRENT_DATE
+        `;
+        const countRes = await db.query(countQuery, [req.veterinaria.id, especie]);
+        const correlativo = parseInt(countRes.rows[0].count) + 1;
+        
+        // 2. Generar el código único de cartilla
+        let especieCodigo = "O";
+        const espLower = especie.toLowerCase().trim();
+        if (espLower === "perro") especieCodigo = "P";
+        else if (espLower === "gato") especieCodigo = "G";
+        
+        const fechaCodigo = formatearFechaAAMMDD(hoy);
+        const contadorStr = correlativo < 100 ? String(correlativo).padStart(2, "0") : String(correlativo);
+        const codigoUnico = `CD-${req.veterinaria.iniciales.toUpperCase()}-${especieCodigo}-${fechaCodigo}-${contadorStr}`;
+        
+        // 3. Insertar mascota
+        const insertQuery = `
+            INSERT INTO mascotas 
+            (codigo, veterinaria_iniciales, veterinaria_id, nombre, especie, raza, sexo, fecha_nacimiento, color, peso, foto_base64, tutor_nombre, tutor_telefono, tutor_direccion, observaciones)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            RETURNING *
+        `;
+        const values = [
+            codigoUnico,
+            req.veterinaria.iniciales,
+            req.veterinaria.id,
+            nombre.trim(),
+            especie.trim(),
+            raza ? raza.trim() : '',
+            sexo,
+            fechaNacimiento,
+            color ? color.trim() : '',
+            peso !== undefined && peso !== '' ? parseFloat(peso) : null,
+            foto || '',
+            tutor.nombre.trim(),
+            tutor.telefono ? tutor.telefono.trim() : '',
+            tutor.direccion ? tutor.direccion.trim() : '',
+            observaciones ? observaciones.trim() : ''
+        ];
+        
+        const result = await db.query(insertQuery, values);
+        const row = result.rows[0];
+        
+        res.status(201).json({
+            id: row.id,
+            codigo: row.codigo,
+            fechaRegistro: row.fecha_registro.toISOString().split('T')[0],
+            veterinariaIniciales: row.veterinaria_iniciales,
+            nombre: row.nombre,
+            especie: row.especie,
+            raza: row.raza || '',
+            sexo: row.sexo,
+            fechaNacimiento: row.fecha_nacimiento.toISOString().split('T')[0],
+            color: row.color || '',
+            peso: row.peso || '',
+            foto: row.foto_base64 || '',
+            tutor: {
+                nombre: row.tutor_nombre,
+                telefono: row.tutor_telefono || '',
+                direccion: row.tutor_direccion || ''
+            },
+            observaciones: row.observaciones || '',
+            vacunas: [],
+            desparasitaciones: [],
+            controles: []
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al registrar la mascota.' });
+    }
+});
+
+/**
+ * Obtener expediente completo de mascota por ID
+ */
+app.get('/api/mascotas/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const mResult = await db.query('SELECT * FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Paciente no encontrado.' });
+        }
+        
+        const row = mResult.rows[0];
+        
+        // Obtener vacunas
+        const vacRes = await db.query('SELECT * FROM vacunas WHERE mascota_id = $1 ORDER BY fecha_aplicacion DESC', [id]);
+        const vacunas = vacRes.rows.map(v => ({
+            id: v.id,
+            nombre: v.nombre,
+            enfermedades: v.enfermedades || '',
+            laboratorio: v.laboratorio || '',
+            fechaAplicacion: v.fecha_aplicacion.toISOString().split('T')[0],
+            proximaDosis: v.proxima_dosis ? v.proxima_dosis.toISOString().split('T')[0] : '',
+            lote: v.lote || '',
+            responsable: v.responsable,
+            observaciones: v.observaciones || ''
+        }));
+        
+        // Obtener desparasitaciones
+        const desRes = await db.query('SELECT * FROM desparasitaciones WHERE mascota_id = $1 ORDER BY fecha_aplicacion DESC', [id]);
+        const desparasitaciones = desRes.rows.map(d => ({
+            id: d.id,
+            tipo: d.tipo,
+            producto: d.producto,
+            tipoProducto: d.tipo_producto || 'tableta',
+            rangoPeso: d.rango_peso || '',
+            parasitosCubre: d.parasitos_cubre || '',
+            fechaAplicacion: d.fecha_aplicacion.toISOString().split('T')[0],
+            proximaAplicacion: d.proxima_aplicacion ? d.proxima_aplicacion.toISOString().split('T')[0] : '',
+            dosis: d.dosis || '',
+            via: d.via || 'Oral',
+            responsable: d.responsable,
+            observaciones: d.observaciones || ''
+        }));
+        
+        // Obtener controles
+        const ctrlRes = await db.query('SELECT * FROM controles WHERE mascota_id = $1 ORDER BY fecha DESC', [id]);
+        const controles = ctrlRes.rows.map(c => ({
+            id: c.id,
+            fecha: c.fecha.toISOString().split('T')[0],
+            motivo: c.motivo,
+            peso: c.peso || '',
+            temperatura: c.temperatura || '',
+            fc: c.fc || '',
+            fr: c.fr || '',
+            hallazgos: c.hallazgos || '',
+            diagnostico: c.diagnostico || '',
+            tratamiento: c.tratamiento || '',
+            recomendaciones: c.recomendaciones || '',
+            proximoControl: c.proximo_control ? c.proximo_control.toISOString().split('T')[0] : ''
+        }));
+        
+        res.json({
+            id: row.id,
+            codigo: row.codigo,
+            fechaRegistro: row.fecha_registro.toISOString().split('T')[0],
+            veterinariaIniciales: row.veterinaria_iniciales,
+            nombre: row.nombre,
+            especie: row.especie,
+            raza: row.raza || '',
+            sexo: row.sexo,
+            fechaNacimiento: row.fecha_nacimiento.toISOString().split('T')[0],
+            color: row.color || '',
+            peso: row.peso || '',
+            foto: row.foto_base64 || '',
+            tutor: {
+                nombre: row.tutor_nombre,
+                telefono: row.tutor_telefono || '',
+                direccion: row.tutor_direccion || ''
+            },
+            observaciones: row.observaciones || '',
+            vacunas,
+            desparasitaciones,
+            controles
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al obtener detalles del paciente.' });
+    }
+});
+
+/**
+ * Actualizar mascota
+ */
+app.put('/api/mascotas/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const { nombre, especie, raza, sexo, fechaNacimiento, color, peso, foto, tutor, observaciones } = req.body;
+    
+    try {
+        const mCheck = await db.query('SELECT * FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        
+        const orig = mCheck.rows[0];
+        
+        // Fusión segura (conservar original si es undefined)
+        const finalNombre = nombre !== undefined ? nombre.trim() : orig.nombre;
+        const finalEspecie = especie !== undefined ? especie.trim() : orig.especie;
+        const finalRaza = raza !== undefined ? raza.trim() : orig.raza;
+        const finalSexo = sexo !== undefined ? sexo : orig.sexo;
+        const finalFechaNac = fechaNacimiento !== undefined ? fechaNacimiento : orig.fecha_nacimiento;
+        const finalColor = color !== undefined ? color.trim() : orig.color;
+        const finalPeso = peso !== undefined && peso !== '' ? parseFloat(peso) : (peso === '' ? null : orig.peso);
+        const finalFoto = foto !== undefined ? foto : orig.foto_base64;
+        const finalTutorNombre = tutor?.nombre !== undefined ? tutor.nombre.trim() : orig.tutor_nombre;
+        const finalTutorTel = tutor?.telefono !== undefined ? tutor.telefono.trim() : orig.tutor_telefono;
+        const finalTutorDir = tutor?.direccion !== undefined ? tutor.direccion.trim() : orig.tutor_direccion;
+        const finalObs = observaciones !== undefined ? observaciones.trim() : orig.observaciones;
+        
+        // Validar los valores finales (después del merge)
+        if (!finalNombre || !finalEspecie || !finalFechaNac || !finalTutorNombre) {
+            return res.status(400).json({ error: 'Nombre, especie, fecha de nacimiento y tutor son obligatorios.' });
+        }
+        
+        const updateQuery = `
+            UPDATE mascotas
+            SET nombre = $1, especie = $2, raza = $3, sexo = $4, fecha_nacimiento = $5, color = $6, peso = $7, foto_base64 = $8, tutor_nombre = $9, tutor_telefono = $10, tutor_direccion = $11, observaciones = $12
+            WHERE id = $13 AND veterinaria_id = $14
+        `;
+        const values = [finalNombre, finalEspecie, finalRaza, finalSexo, finalFechaNac, finalColor, finalPeso, finalFoto, finalTutorNombre, finalTutorTel, finalTutorDir, finalObs, id, req.veterinaria.id];
+        await db.query(updateQuery, values);
+        
+        res.json({ mensaje: 'Paciente actualizado con éxito.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar paciente.' });
+    }
+});
+
+/**
+ * Eliminar mascota
+ */
+app.delete('/api/mascotas/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await db.query('DELETE FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        res.json({ mensaje: 'Expediente clínico eliminado permanentemente.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al eliminar el expediente.' });
+    }
+});
+
+
+// --- HISTORIAL CLÍNICO: VACUNAS ---
+
+app.post('/api/mascotas/:id/vacunas', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const { nombre, enfermedades, laboratorio, fechaAplicacion, proximaDosis, lote, responsable, responsableId, observaciones } = req.body;
+    
+    if (!nombre || !fechaAplicacion || !responsable) {
+        return res.status(400).json({ error: 'Nombre, fecha de aplicación y responsable son obligatorios.' });
+    }
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        
+        const queryText = `
+            INSERT INTO vacunas (mascota_id, nombre, enfermedades, laboratorio, fecha_aplicacion, proxima_dosis, lote, responsable, responsable_id, observaciones)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `;
+        const values = [
+            id,
+            nombre.trim(),
+            enfermedades ? enfermedades.trim() : '',
+            laboratorio ? laboratorio.trim() : '',
+            fechaAplicacion,
+            proximaDosis || null,
+            lote ? lote.trim() : '',
+            responsable.trim(),
+            responsableId || null,
+            observaciones ? observaciones.trim() : ''
+        ];
+        
+        await db.query(queryText, values);
+        res.status(201).json({ mensaje: 'Vacuna agregada correctamente.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al guardar la vacuna.' });
+    }
+});
+
+app.put('/api/mascotas/:id/vacunas/:vacunaId', authMiddleware, async (req, res) => {
+    const { id, vacunaId } = req.params;
+    const { nombre, enfermedades, laboratorio, fechaAplicacion, proximaDosis, lote, responsable, responsableId, observaciones } = req.body;
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        
+        const queryText = `
+            UPDATE vacunas
+            SET nombre = $1, enfermedades = $2, laboratorio = $3, fecha_aplicacion = $4, proxima_dosis = $5, lote = $6, responsable = $7, responsable_id = $8, observaciones = $9
+            WHERE id = $10 AND mascota_id = $11
+        `;
+        const values = [nombre.trim(), enfermedades, laboratorio, fechaAplicacion, proximaDosis || null, lote, responsable, responsableId || null, observaciones, vacunaId, id];
+        const result = await db.query(queryText, values);
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Vacuna no encontrada.' });
+        }
+        
+        res.json({ mensaje: 'Vacuna actualizada correctamente.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar la vacuna.' });
+    }
+});
+
+app.delete('/api/mascotas/:id/vacunas/:vacunaId', authMiddleware, async (req, res) => {
+    const { id, vacunaId } = req.params;
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada o sin permisos.' });
+        }
+        
+        const result = await db.query('DELETE FROM vacunas WHERE id = $1 AND mascota_id = $2', [vacunaId, id]);
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Vacuna no encontrada.' });
+        }
+        
+        res.json({ mensaje: 'Vacuna eliminada correctamente.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al eliminar la vacuna.' });
+    }
+});
+
+
+// --- HISTORIAL CLÍNICO: DESPARASITACIONES ---
+
+app.post('/api/mascotas/:id/desparasitaciones', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const { tipo, producto, tipoProducto, rangoPeso, parasitosCubre, fechaAplicacion, proximaAplicacion, dosis, via, responsable, responsableId, observaciones } = req.body;
+    
+    if (!producto || !fechaAplicacion || !responsable) {
+        return res.status(400).json({ error: 'Producto, fecha de aplicación y responsable son obligatorios.' });
+    }
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        
+        const queryText = `
+            INSERT INTO desparasitaciones (mascota_id, tipo, producto, tipo_producto, rango_peso, parasitos_cubre, fecha_aplicacion, proxima_aplicacion, dosis, via, responsable, responsable_id, observaciones)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        `;
+        const values = [
+            id,
+            tipo || 'interna',
+            producto.trim(),
+            tipoProducto || 'tableta',
+            rangoPeso || '',
+            parasitosCubre || '',
+            fechaAplicacion,
+            proximaAplicacion || null,
+            dosis || '',
+            via || 'Oral',
+            responsable.trim(),
+            responsableId || null,
+            observaciones ? observaciones.trim() : ''
+        ];
+        
+        await db.query(queryText, values);
+        res.status(201).json({ mensaje: 'Desparasitación agregada correctamente.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al registrar desparasitación.' });
+    }
+});
+
+app.put('/api/mascotas/:id/desparasitaciones/:desparasitacionId', authMiddleware, async (req, res) => {
+    const { id, desparasitacionId } = req.params;
+    const { tipo, producto, tipoProducto, rangoPeso, parasitosCubre, fechaAplicacion, proximaAplicacion, dosis, via, responsable, responsableId, observaciones } = req.body;
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        
+        const queryText = `
+            UPDATE desparasitaciones
+            SET tipo = $1, producto = $2, tipo_producto = $3, rango_peso = $4, parasitos_cubre = $5, fecha_aplicacion = $6, proxima_aplicacion = $7, dosis = $8, via = $9, responsable = $10, responsable_id = $11, observaciones = $12
+            WHERE id = $13 AND mascota_id = $14
+        `;
+        const values = [tipo || 'interna', producto.trim(), tipoProducto, rangoPeso, parasitosCubre, fechaAplicacion, proximaAplicacion || null, dosis, via, responsable, responsableId || null, observaciones, desparasitacionId, id];
+        const result = await db.query(queryText, values);
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Desparasitación no encontrada.' });
+        }
+        res.json({ mensaje: 'Desparasitación actualizada correctamente.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar desparasitación.' });
+    }
+});
+
+app.delete('/api/mascotas/:id/desparasitaciones/:desparasitacionId', authMiddleware, async (req, res) => {
+    const { id, desparasitacionId } = req.params;
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada o sin permisos.' });
+        }
+        
+        const result = await db.query('DELETE FROM desparasitaciones WHERE id = $1 AND mascota_id = $2', [desparasitacionId, id]);
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Desparasitación no encontrada.' });
+        }
+        
+        res.json({ mensaje: 'Desparasitación eliminada correctamente.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al eliminar desparasitación.' });
+    }
+});
+
+
+// --- HISTORIAL CLÍNICO: CONTROLES ---
+
+app.post('/api/mascotas/:id/controles', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const { fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximoControl, responsable, responsableId } = req.body;
+    
+    if (!motivo || !responsable) {
+        return res.status(400).json({ error: 'El motivo y el responsable son obligatorios.' });
+    }
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        
+        await db.query('BEGIN');
+        
+        const queryText = `
+            INSERT INTO controles (mascota_id, fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximo_control, responsable, responsable_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        `;
+        const values = [
+            id,
+            fecha || new Date().toISOString().split('T')[0],
+            motivo.trim(),
+            peso !== undefined && peso !== '' ? parseFloat(peso) : null,
+            temperatura !== undefined && temperatura !== '' ? parseFloat(temperatura) : null,
+            fc !== undefined && fc !== '' ? parseInt(fc) : null,
+            fr !== undefined && fr !== '' ? parseInt(fr) : null,
+            hallazgos || '',
+            diagnostico || '',
+            tratamiento || '',
+            recomendaciones || '',
+            proximoControl || null,
+            responsable.trim(),
+            responsableId || null
+        ];
+        
+        await db.query(queryText, values);
+        
+        // Actualizar peso de la mascota si tiene peso en el control
+        if (peso !== undefined && peso !== '') {
+            await db.query('UPDATE mascotas SET peso = $1 WHERE id = $2', [parseFloat(peso), id]);
+        }
+        
+        await db.query('COMMIT');
+        res.status(201).json({ mensaje: 'Control clínico registrado correctamente.' });
+    } catch (err) {
+        await db.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Error al registrar el control.' });
+    }
+});
+
+app.put('/api/mascotas/:id/controles/:controlId', authMiddleware, async (req, res) => {
+    const { id, controlId } = req.params;
+    const { fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximoControl, responsable, responsableId } = req.body;
+    
+    if (!motivo || !responsable) {
+        return res.status(400).json({ error: 'El motivo y el responsable son obligatorios.' });
+    }
+
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        
+        await db.query('BEGIN');
+        
+        const queryText = `
+            UPDATE controles
+            SET fecha = $1, motivo = $2, peso = $3, temperatura = $4, fc = $5, fr = $6, hallazgos = $7, diagnostico = $8, tratamiento = $9, recomendaciones = $10, proximo_control = $11, responsable = $12, responsable_id = $13
+            WHERE id = $14 AND mascota_id = $15
+        `;
+        const values = [
+            fecha || new Date().toISOString().split('T')[0],
+            motivo.trim(),
+            peso !== undefined && peso !== '' ? parseFloat(peso) : null,
+            temperatura !== undefined && temperatura !== '' ? parseFloat(temperatura) : null,
+            fc !== undefined && fc !== '' ? parseInt(fc) : null,
+            fr !== undefined && fr !== '' ? parseInt(fr) : null,
+            hallazgos,
+            diagnostico,
+            tratamiento,
+            recomendaciones,
+            proximoControl || null,
+            responsable.trim(),
+            responsableId || null,
+            controlId,
+            id
+        ];
+        const result = await db.query(queryText, values);
+        
+        if (result.rowCount === 0) {
+            await db.query('ROLLBACK');
+            return res.status(404).json({ error: 'Control no encontrado.' });
+        }
+        
+        // Recalcular el peso general con el más reciente
+        if (peso !== undefined && peso !== '') {
+            const weightQuery = `
+                SELECT peso FROM controles 
+                WHERE mascota_id = $1 AND peso IS NOT NULL 
+                ORDER BY fecha DESC, id DESC 
+                LIMIT 1
+            `;
+            const weightRes = await db.query(weightQuery, [id]);
+            if (weightRes.rows.length > 0) {
+                await db.query('UPDATE mascotas SET peso = $1 WHERE id = $2', [weightRes.rows[0].peso, id]);
+            }
+        }
+        
+        await db.query('COMMIT');
+        res.json({ mensaje: 'Control clínico actualizado correctamente.' });
+    } catch (err) {
+        await db.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar control.' });
+    }
+});
+
+app.delete('/api/mascotas/:id/controles/:controlId', authMiddleware, async (req, res) => {
+    const { id, controlId } = req.params;
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada o sin permisos.' });
+        }
+        
+        const result = await db.query('DELETE FROM controles WHERE id = $1 AND mascota_id = $2', [controlId, id]);
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Control no encontrado.' });
+        }
+        
+        // Recalcular el peso general con el más reciente
+        const weightQuery = `
+            SELECT peso FROM controles 
+            WHERE mascota_id = $1 AND peso IS NOT NULL 
+            ORDER BY fecha DESC, id DESC 
+            LIMIT 1
+        `;
+        const weightRes = await db.query(weightQuery, [id]);
+        if (weightRes.rows.length > 0) {
+            await db.query('UPDATE mascotas SET peso = $1 WHERE id = $2', [weightRes.rows[0].peso, id]);
+        } else {
+            await db.query('UPDATE mascotas SET peso = NULL WHERE id = $2', [id]);
+        }
+        
+        res.json({ mensaje: 'Control clínico eliminado correctamente.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al eliminar control.' });
+    }
+});
+
+
+// --- TRANSFERENCIA DE PACIENTES ---
+
+/**
+ * Iniciar transferencia
+ */
+app.post('/api/transferencias/iniciar', authMiddleware, async (req, res) => {
+    const { mascotaId } = req.body;
+    if (!mascotaId) return res.status(400).json({ error: 'ID de mascota es requerido.' });
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [mascotaId, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada en tus registros.' });
+        }
+        
+        // Generar código único aleatorio: TX-XXXXXX (6 caracteres hex)
+        const randomCode = 'TX-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        const expiration = new Date();
+        expiration.setHours(expiration.getHours() + 24); // Expira en 24 horas
+        
+        // Cambiar transferencias pendientes previas de este paciente a "expiradas"
+        await db.query("UPDATE transferencias SET estado = 'expirada' WHERE mascota_id = $1 AND estado = 'pendiente'", [mascotaId]);
+        
+        const insertQuery = `
+            INSERT INTO transferencias (mascota_id, veterinaria_origen_id, codigo_transferencia, estado, fecha_expiracion)
+            VALUES ($1, $2, $3, 'pendiente', $4)
+            RETURNING codigo_transferencia
+        `;
+        const result = await db.query(insertQuery, [mascotaId, req.veterinaria.id, randomCode, expiration]);
+        
+        res.status(201).json({ codigo: result.rows[0].codigo_transferencia, expiracion: expiration });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al iniciar la transferencia.' });
+    }
+});
+
+/**
+ * Completar transferencia
+ */
+app.post('/api/transferencias/completar', authMiddleware, async (req, res) => {
+    const { codigo } = req.body;
+    if (!codigo) return res.status(400).json({ error: 'El código de transferencia es requerido.' });
+    
+    const codigoClean = codigo.trim().toUpperCase();
+    
+    try {
+        await db.query('BEGIN');
+        
+        const queryText = `
+            SELECT * FROM transferencias 
+            WHERE codigo_transferencia = $1 
+              AND estado = 'pendiente' 
+              AND fecha_expiracion > NOW()
+        `;
+        const result = await db.query(queryText, [codigoClean]);
+        if (result.rows.length === 0) {
+            await db.query('ROLLBACK');
+            return res.status(400).json({ error: 'El código ingresado es inválido, ya fue usado o ha expirado.' });
+        }
+        
+        const tx = result.rows[0];
+        
+        if (tx.veterinaria_origen_id === req.veterinaria.id) {
+            await db.query('ROLLBACK');
+            return res.status(400).json({ error: 'Este paciente ya pertenece a tu veterinaria.' });
+        }
+        
+        // 1. Cambiar la propiedad de la mascota a la nueva clínica
+        const updateMascotaQuery = `
+            UPDATE mascotas
+            SET veterinaria_id = $1, veterinaria_iniciales = $2
+            WHERE id = $3
+        `;
+        await db.query(updateMascotaQuery, [req.veterinaria.id, req.veterinaria.iniciales, tx.mascota_id]);
+        
+        // 2. Marcar transferencia como completada
+        const updateTxQuery = `
+            UPDATE transferencias
+            SET estado = 'completada', veterinaria_destino_id = $1
+            WHERE id = $2
+        `;
+        await db.query(updateTxQuery, [req.veterinaria.id, tx.id]);
+        
+        await db.query('COMMIT');
+        res.json({ mensaje: 'Paciente transferido con éxito. Ya puedes ver su cartilla en tu panel.' });
+    } catch (err) {
+        await db.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Error al completar la transferencia.' });
+    }
+});
+
+
+// --- RUTA PÚBLICA (LECTURA SEGURA PARA CÓDIGO QR / DUEÑOS DE MASCOTAS) ---
+
+/**
+ * Obtiene los datos clínicos públicos y de libre acceso para los tutores
+ */
+app.get('/api/public/mascotas/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const mResult = await db.query(`
+            SELECT m.*, v.nombre AS veterinaria_nombre, v.telefono AS veterinaria_telefono, v.direccion AS veterinaria_direccion, v.logo_base64 AS veterinaria_logo
+            FROM mascotas m
+            JOIN veterinarias v ON m.veterinaria_id = v.id
+            WHERE m.id = $1
+        `, [id]);
+        
+        if (mResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Cartilla digital no encontrada.' });
+        }
+        
+        const row = mResult.rows[0];
+        
+        // Obtener vacunas
+        const vacRes = await db.query('SELECT * FROM vacunas WHERE mascota_id = $1 ORDER BY fecha_aplicacion DESC', [id]);
+        const vacunas = vacRes.rows.map(v => ({
+            id: v.id,
+            nombre: v.nombre,
+            enfermedades: v.enfermedades || '',
+            laboratorio: v.laboratorio || '',
+            fechaAplicacion: v.fecha_aplicacion.toISOString().split('T')[0],
+            proximaDosis: v.proxima_dosis ? v.proxima_dosis.toISOString().split('T')[0] : '',
+            lote: v.lote || '',
+            responsable: v.responsable,
+            observaciones: v.observaciones || ''
+        }));
+        
+        // Obtener desparasitaciones
+        const desRes = await db.query('SELECT * FROM desparasitaciones WHERE mascota_id = $1 ORDER BY fecha_aplicacion DESC', [id]);
+        const desparasitaciones = desRes.rows.map(d => ({
+            id: d.id,
+            tipo: d.tipo,
+            producto: d.producto,
+            tipoProducto: d.tipo_producto || 'tableta',
+            rangoPeso: d.rango_peso || '',
+            parasitosCubre: d.parasitos_cubre || '',
+            fechaAplicacion: d.fecha_aplicacion.toISOString().split('T')[0],
+            proximaAplicacion: d.proxima_aplicacion ? d.proxima_aplicacion.toISOString().split('T')[0] : '',
+            dosis: d.dosis || '',
+            via: d.via || 'Oral',
+            responsable: d.responsable,
+            observaciones: d.observaciones || ''
+        }));
+        
+        // Obtener controles
+        const ctrlRes = await db.query('SELECT * FROM controles WHERE mascota_id = $1 ORDER BY fecha DESC', [id]);
+        const controles = ctrlRes.rows.map(c => ({
+            id: c.id,
+            fecha: c.fecha.toISOString().split('T')[0],
+            motivo: c.motivo,
+            peso: c.peso || '',
+            temperatura: c.temperatura || '',
+            fc: c.fc || '',
+            fr: c.fr || '',
+            hallazgos: c.hallazgos || '',
+            diagnostico: c.diagnostico || '',
+            tratamiento: c.tratamiento || '',
+            recomendaciones: c.recomendaciones || '',
+            proximoControl: c.proximo_control ? c.proximo_control.toISOString().split('T')[0] : ''
+        }));
+        
+        res.json({
+            id: row.id,
+            codigo: row.codigo,
+            fechaRegistro: row.fecha_registro.toISOString().split('T')[0],
+            veterinariaIniciales: row.veterinaria_iniciales,
+            nombre: row.nombre,
+            especie: row.especie,
+            raza: row.raza || '',
+            sexo: row.sexo,
+            fechaNacimiento: row.fecha_nacimiento.toISOString().split('T')[0],
+            color: row.color || '',
+            peso: row.peso || '',
+            foto: row.foto_base64 || '',
+            tutor: {
+                nombre: row.tutor_nombre,
+                telefono: '', // OCULTO POR PRIVACIDAD Y SEGURIDAD EN VISTA PÚBLICA
+                direccion: '' // OCULTO POR PRIVACIDAD Y SEGURIDAD EN VISTA PÚBLICA
+            },
+            observaciones: row.observaciones || '',
+            vacunas,
+            desparasitaciones,
+            controles,
+            veterinaria: {
+                nombre: row.veterinaria_nombre,
+                telefono: row.veterinaria_telefono || '',
+                direccion: row.veterinaria_direccion || '',
+                logo: row.veterinaria_logo || ''
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al obtener la cartilla pública.' });
+    }
+});
+
+
+// --- RUTAS DE EQUIPO VETERINARIO ---
+
+/**
+ * Obtener todo el equipo de la clínica (incluyendo inactivos para historial)
+ */
+app.get('/api/equipo', authMiddleware, async (req, res) => {
+    try {
+        const queryText = `
+            SELECT * FROM equipo_veterinario 
+            WHERE veterinaria_id = $1 
+            ORDER BY es_principal DESC, nombre ASC
+        `;
+        const result = await db.query(queryText, [req.veterinaria.id]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error al obtener equipo:', err);
+        res.status(500).json({ error: 'Error al obtener el equipo veterinario.' });
+    }
+});
+
+/**
+ * Agregar un nuevo integrante
+ */
+app.post('/api/equipo', authMiddleware, async (req, res) => {
+    const { nombre, cargo, estado } = req.body;
+    if (!nombre || !cargo) {
+        return res.status(400).json({ error: 'Nombre y cargo son requeridos.' });
+    }
+    
+    try {
+        const queryText = `
+            INSERT INTO equipo_veterinario (veterinaria_id, nombre, cargo, estado)
+            VALUES ($1, $2, $3, $4)
+            RETURNING *
+        `;
+        const result = await db.query(queryText, [req.veterinaria.id, nombre.trim(), cargo.trim(), estado || 'activo']);
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error al agregar integrante:', err);
+        res.status(500).json({ error: 'Error al agregar integrante al equipo.' });
+    }
+});
+
+/**
+ * Actualizar integrante
+ */
+app.put('/api/equipo/:id', authMiddleware, async (req, res) => {
+    const { nombre, cargo, estado } = req.body;
+    const { id } = req.params;
+    
+    if (!nombre || !cargo) {
+        return res.status(400).json({ error: 'Nombre y cargo son requeridos.' });
+    }
+    
+    try {
+        const queryText = `
+            UPDATE equipo_veterinario 
+            SET nombre = $1, cargo = $2, estado = $3
+            WHERE id = $4 AND veterinaria_id = $5
+            RETURNING *
+        `;
+        const result = await db.query(queryText, [nombre.trim(), cargo.trim(), estado, id, req.veterinaria.id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Integrante no encontrado o no tienes permiso.' });
+        }
+        
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error al actualizar integrante:', err);
+        res.status(500).json({ error: 'Error al actualizar integrante.' });
+    }
+});
+
+/**
+ * Eliminar / Desactivar integrante
+ */
+app.delete('/api/equipo/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+        // Verificar si es principal
+        const checkQuery = await db.query('SELECT es_principal FROM equipo_veterinario WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (checkQuery.rows.length === 0) {
+            return res.status(404).json({ error: 'Integrante no encontrado.' });
+        }
+        if (checkQuery.rows[0].es_principal) {
+            return res.status(400).json({ error: 'No se puede eliminar al médico principal.' });
+        }
+        
+        // Primero, revisar si tiene registros médicos vinculados para decidir si hacer soft delete
+        const vacunasCount = await db.query('SELECT id FROM vacunas WHERE responsable_id = $1 LIMIT 1', [id]);
+        const despCount = await db.query('SELECT id FROM desparasitaciones WHERE responsable_id = $1 LIMIT 1', [id]);
+        const controlesCount = await db.query('SELECT id FROM controles WHERE responsable_id = $1 LIMIT 1', [id]);
+        
+        if (vacunasCount.rows.length > 0 || despCount.rows.length > 0 || controlesCount.rows.length > 0) {
+            // Tiene registros, hacer soft delete (marcar inactivo)
+            await db.query('UPDATE equipo_veterinario SET estado = $1 WHERE id = $2 AND veterinaria_id = $3', ['inactivo', id, req.veterinaria.id]);
+            return res.json({ mensaje: 'El integrante tiene registros médicos. Se ha marcado como INACTIVO en lugar de eliminarse por completo para preservar el historial.', softDelete: true });
+        } else {
+            // No tiene registros, borrar físico
+            await db.query('DELETE FROM equipo_veterinario WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+            return res.json({ mensaje: 'Integrante eliminado correctamente.', softDelete: false });
+        }
+    } catch (err) {
+        console.error('Error al eliminar integrante:', err);
+        res.status(500).json({ error: 'Error al eliminar integrante.' });
+    }
+});
+
+// --- INICIALIZACIÓN DEL SERVIDOR ---
+
+app.listen(PORT, () => {
+    console.log(`Servidor backend corriendo en puerto ${PORT}`);
+});
