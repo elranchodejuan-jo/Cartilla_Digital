@@ -21,6 +21,16 @@ const migrarBaseDatos = async () => {
             ADD COLUMN IF NOT EXISTS tutor_telefono VARCHAR(50),
             ADD COLUMN IF NOT EXISTS tutor_direccion TEXT;
         `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                veterinaria_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+                token VARCHAR(64) UNIQUE NOT NULL,
+                expira_en TIMESTAMP NOT NULL,
+                usado BOOLEAN DEFAULT FALSE,
+                fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
         console.log('Migración de base de datos verificada y al día.');
     } catch (e) {
         console.error('Error durante la migración automática de la base de datos:', e.message);

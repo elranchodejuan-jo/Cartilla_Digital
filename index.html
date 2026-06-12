@@ -73,6 +73,9 @@
                     <span style="color: var(--text-muted);">¿Aún no tienes cuenta?</span>
                     <a href="#" onclick="navegarA('registroClinica'); return false;" style="color: var(--primary); font-weight: 600; text-decoration: none; margin-left: 4px;">Regístrate aquí</a>
                 </div>
+                <div style="text-align: center; margin-top: 12px; font-size: 14px;">
+                    <a href="#" onclick="navegarA('forgotPassword'); return false;" style="color: var(--text-muted); text-decoration: none;">¿Olvidaste tu contraseña?</a>
+                </div>
             </div>
         </section>
 
@@ -123,6 +126,51 @@
                 <div style="text-align: center; margin-top: 20px; font-size: 14px;">
                     <span style="color: var(--text-muted);">¿Ya tienes una cuenta?</span>
                     <a href="#" onclick="navegarA('login'); return false;" style="color: var(--primary); font-weight: 600; text-decoration: none; margin-left: 4px;">Inicia sesión aquí</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= MÓDULO: OLVIDÉ MI CONTRASEÑA ================= -->
+        <section id="section-forgot-password" class="app-section" aria-labelledby="forgot-title">
+            <div class="form-card" style="max-width: 450px; margin: 40px auto; box-shadow: var(--shadow-lg);">
+                <h2 id="forgot-title" class="form-title" style="text-align: center;">Recuperar Contraseña</h2>
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 24px;">Ingresa el correo electrónico registrado y te enviaremos un enlace para restablecer tu contraseña.</p>
+                <form id="form-forgot-password">
+                    <div class="form-group form-group-full">
+                        <label for="forgot-email">Correo Electrónico *</label>
+                        <input type="email" id="forgot-email" class="form-control" placeholder="ejemplo@veterinaria.com" required>
+                    </div>
+                    <div style="margin-top: 24px;">
+                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight:700;">Enviar Enlace de Recuperación</button>
+                    </div>
+                </form>
+                <div style="text-align: center; margin-top: 20px; font-size: 14px;">
+                    <a href="#" onclick="navegarA('login'); return false;" style="color: var(--primary); font-weight: 600; text-decoration: none;">⬅️ Volver al inicio de sesión</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= MÓDULO: RESTABLECER CONTRASEÑA ================= -->
+        <section id="section-reset-password" class="app-section" aria-labelledby="reset-title">
+            <div class="form-card" style="max-width: 450px; margin: 40px auto; box-shadow: var(--shadow-lg);">
+                <h2 id="reset-title" class="form-title" style="text-align: center;">Restablecer Contraseña</h2>
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 24px;">Ingresa tu nueva contraseña para restablecer el acceso a tu cuenta.</p>
+                <form id="form-reset-password">
+                    <input type="hidden" id="reset-token">
+                    <div class="form-group form-group-full">
+                        <label for="reset-new-password">Nueva Contraseña *</label>
+                        <input type="password" id="reset-new-password" class="form-control" placeholder="Mínimo 6 caracteres" minlength="6" required>
+                    </div>
+                    <div class="form-group form-group-full">
+                        <label for="reset-confirm-password">Confirmar Nueva Contraseña *</label>
+                        <input type="password" id="reset-confirm-password" class="form-control" placeholder="Repite la contraseña" minlength="6" required>
+                    </div>
+                    <div style="margin-top: 24px;">
+                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight:700;">Guardar Nueva Contraseña</button>
+                    </div>
+                </form>
+                <div style="text-align: center; margin-top: 20px; font-size: 14px;">
+                    <a href="#" onclick="navegarA('login'); return false;" style="color: var(--primary); font-weight: 600; text-decoration: none;">⬅️ Volver al inicio de sesión</a>
                 </div>
             </div>
         </section>
@@ -482,17 +530,17 @@
             
             <!-- Barra de Acciones de la Cartilla -->
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
-                <button id="btn-back-to-patients" class="btn btn-secondary no-print" onclick="navegarA('pacientes')" aria-label="Regresar al listado de pacientes de la clínica">
+                <button id="btn-back-to-patients" class="btn btn-secondary no-print no-public" onclick="navegarA('pacientes')" aria-label="Regresar al listado de pacientes de la clínica">
                     <span>⬅️</span> Volver a Pacientes
                 </button>
                 <div style="display:flex; gap:8px; flex-wrap: wrap;">
                     <button class="btn btn-secondary no-print no-public" onclick="iniciarTransferenciaMascota()" aria-label="Iniciar transferencia de paciente">
                         🔄 Transferir
                     </button>
-                    <button class="btn btn-secondary no-print" onclick="copiarEnlaceCartilla()" aria-label="Copiar link público de la cartilla">
+                    <button class="btn btn-secondary no-print no-public" onclick="copiarEnlaceCartilla()" aria-label="Copiar link público de la cartilla">
                         🔗 Copiar Enlace
                     </button>
-                    <button class="btn btn-secondary no-print" onclick="compartirWhatsApp()" aria-label="Compartir cartilla clínica por WhatsApp">
+                    <button class="btn btn-secondary no-print no-public" onclick="compartirWhatsApp()" aria-label="Compartir cartilla clínica por WhatsApp">
                         💬 WhatsApp
                     </button>
                     <button class="btn btn-primary no-print" onclick="imprimirCartilla()" aria-label="Imprimir cartilla médica del paciente">

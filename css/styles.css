@@ -762,16 +762,14 @@ textarea.form-control {
 }
 
 .qr-box {
-    width: 150px;
-    height: 150px;
+    width: 180px;
+    height: 180px;
     margin: 0 auto 16px;
     background-color: var(--background);
-    border-radius: var(--radius-md);
     border: 1px dashed var(--border-gray);
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
 }
 
 .qr-box canvas, .qr-box img {
@@ -820,8 +818,10 @@ textarea.form-control {
 }
 
 /* Ocultar botones de modificación en modo público */
-body.public-view .no-print,
 body.public-view .section-header button {
+    display: none !important;
+}
+body.public-view .header {
     display: none !important;
 }
 
@@ -1181,6 +1181,10 @@ body.public-view .section-header button {
     background-color: var(--card-bg);
     color: var(--text-main);
     flex-shrink: 0;
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 1000;
 }
 
 .btn-theme-toggle:hover {
@@ -1653,6 +1657,7 @@ body.public-view #theme-toggle {
         margin-bottom: 0 !important;
         border-radius: 8px !important;
         page-break-inside: avoid !important;
+        filter: none !important;
     }
     
     .clinical-section {
@@ -1660,8 +1665,8 @@ body.public-view #theme-toggle {
     }
     
     .cartilla-photo {
-        width: 80px !important;
-        height: 80px !important;
+        width: 110px !important;
+        height: 110px !important;
         border: 1px solid #EEEEEE !important;
         box-shadow: none !important;
     }
@@ -1718,8 +1723,8 @@ body.public-view #theme-toggle {
     /* Redimensionar el código QR en impresión */
     #qrcode canvas,
     #qrcode img {
-        width: 80px !important;
-        height: 80px !important;
+        width: 120px !important;
+        height: 120px !important;
         margin: 0 auto !important;
     }
     

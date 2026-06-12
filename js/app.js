@@ -66,6 +66,16 @@ async function verificarEnrutamiento() {
     const urlParams = new URLSearchParams(window.location.search);
     const petId = urlParams.get('id');
     
+    // Verificar si hay un token de recuperación de contraseña en la URL
+    const resetToken = urlParams.get('reset_token');
+    if (resetToken) {
+        configurarModoPublico(false);
+        navegarA('resetPassword');
+        const tokenInput = document.getElementById('reset-token');
+        if (tokenInput) tokenInput.value = resetToken;
+        return;
+    }
+    
     if (petId) {
         try {
             // Activar Modo Público (oculta admin header y botones clínicos)
@@ -540,6 +550,69 @@ function configurarManejadoresFormularios() {
                 
                 // Recargar listado
                 navegarA('pacientes');
+            } catch (err) {
+                mostrarToast(err.message, 'error');
+            }
+        });
+    }
+
+    // Formulario de Olvidé mi Contraseña
+    const formForgot = document.getElementById('form-forgot-password');
+    if (formForgot) {
+        formForgot.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('forgot-email').value.trim();
+            
+            if (!email) {
+                mostrarToast('Ingresa tu correo electrónico.', 'error');
+                return;
+            }
+            
+            try {
+                mostrarToast('Enviando enlace de recuperación...', 'info');
+                const res = await API.forgotPassword(email);
+                mostrarToast(res.mensaje || 'Si el correo está registrado, recibirás un enlace de recuperación.', 'success');
+                document.getElementById('forgot-email').value = '';
+            } catch (err) {
+                mostrarToast(err.message, 'error');
+            }
+        });
+    }
+
+    // Formulario de Restablecer Contraseña
+    const formReset = document.getElementById('form-reset-password');
+    if (formReset) {
+        formReset.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = document.getElementById('reset-token').value;
+            const newPassword = document.getElementById('reset-new-password').value;
+            const confirmPassword = document.getElementById('reset-confirm-password').value;
+            
+            if (!newPassword || !confirmPassword) {
+                mostrarToast('Completa ambos campos de contraseña.', 'error');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                mostrarToast('Las contraseñas no coinciden.', 'error');
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                mostrarToast('La contraseña debe tener al menos 6 caracteres.', 'error');
+                return;
+            }
+            
+            try {
+                mostrarToast('Restableciendo contraseña...', 'info');
+                const res = await API.resetPassword(token, newPassword);
+                mostrarToast(res.mensaje || '¡Contraseña actualizada! Ya puedes iniciar sesión.', 'success');
+                
+                // Limpiar el token de la URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Redirigir al login después de 2 segundos
+                setTimeout(() => { navegarA('login'); }, 2000);
             } catch (err) {
                 mostrarToast(err.message, 'error');
             }

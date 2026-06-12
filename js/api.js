@@ -322,6 +322,35 @@ const API = {
         return this.handleResponse(res);
     },
 
+    // --- RECUPERACIÓN DE CONTRASEÑA ---
+    async forgotPassword(email) {
+        const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+            method: 'POST',
+            headers: this.getHeaders(false),
+            body: JSON.stringify({ email })
+        });
+        return this.handleResponse(res);
+    },
+
+    async resetPassword(token, newPassword) {
+        const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+            method: 'POST',
+            headers: this.getHeaders(false),
+            body: JSON.stringify({ token, newPassword })
+        });
+        return this.handleResponse(res);
+    },
+
+    // --- SUBIDA DE IMÁGENES ---
+    async uploadImage(base64String, carpeta) {
+        const res = await fetch(`${API_BASE_URL}/upload-image`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ imagen: base64String, carpeta: carpeta || 'general' })
+        });
+        return this.handleResponse(res);
+    },
+
     // --- RUTA PÚBLICA (QR) ---
     async obtenerMascotaPublica(id) {
         const res = await fetch(`${API_BASE_URL}/public/mascotas/${id}`, {

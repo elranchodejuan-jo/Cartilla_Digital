@@ -112,3 +112,15 @@ CREATE TABLE IF NOT EXISTS transferencias (
 );
 
 CREATE INDEX IF NOT EXISTS idx_transferencias_codigo ON transferencias(codigo_transferencia);
+
+-- 7. TABLA: TOKENS DE RECUPERACIÓN DE CONTRASEÑA
+CREATE TABLE IF NOT EXISTS password_resets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    veterinaria_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+    token VARCHAR(64) UNIQUE NOT NULL,
+    expira_en TIMESTAMP NOT NULL,
+    usado BOOLEAN DEFAULT FALSE,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token);

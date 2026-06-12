@@ -6,6 +6,22 @@ const db = require('./db');
 const authMiddleware = require('./authMiddleware');
 require('dotenv').config();
 
+const crypto = require('crypto');
+const supabase = require('./supabaseClient');
+
+let resend = null;
+try {
+    const { Resend } = require('resend');
+    if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 'PENDIENTE_CONFIGURAR') {
+        resend = new Resend(process.env.RESEND_API_KEY);
+        console.log('Cliente de Resend (email) inicializado correctamente.');
+    } else {
+        console.warn('⚠️  Resend no configurado. La recuperación de contraseña por email no estará disponible.');
+    }
+} catch (e) {
+    console.warn('⚠️  Módulo Resend no disponible:', e.message);
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -41,7 +57,9 @@ app.post('/api/auth/register', async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id, email, nombre, iniciales
         `;
-        const values = [email.trim().toLowerCase(), passwordHash, nombre.trim(), inicialesUpper, telefono, direccion, logo];
+        // Subir logo a Storage si es Base64
+        const logoFinal = await subirImagenAStorage(logo, 'logos');
+        const values = [email.trim().toLowerCase(), passwordHash, nombre.trim(), inicialesUpper, telefono, direccion, logoFinal];
         
         const result = await db.query(queryText, values);
         const vetId = result.rows[0].id;
@@ -118,6 +136,126 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+/**
+ * Solicitar recuperación de contraseña
+ */
+app.post('/api/auth/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    
+    if (!email) {
+        return res.status(400).json({ error: 'El correo electrónico es requerido.' });
+    }
+    
+    try {
+        // Buscar la veterinaria por correo
+        const result = await db.query('SELECT id, nombre FROM veterinarias WHERE email = $1', [email.trim().toLowerCase()]);
+        
+        // Por seguridad, siempre responder con éxito incluso si no existe el correo
+        if (result.rows.length === 0) {
+            return res.json({ mensaje: 'Si el correo está registrado, recibirás un enlace de recuperación.' });
+        }
+        
+        const vet = result.rows[0];
+        
+        // Invalidar tokens anteriores no usados
+        await db.query("UPDATE password_resets SET usado = TRUE WHERE veterinaria_id = $1 AND usado = FALSE", [vet.id]);
+        
+        // Generar token seguro
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiraEn = new Date();
+        expiraEn.setMinutes(expiraEn.getMinutes() + 15); // Expira en 15 minutos
+        
+        // Guardar en base de datos
+        await db.query(
+            'INSERT INTO password_resets (veterinaria_id, token, expira_en) VALUES ($1, $2, $3)',
+            [vet.id, token, expiraEn]
+        );
+        
+        // Enviar correo electrónico
+        const frontendUrl = process.env.FRONTEND_URL || 'https://elranchodejuan-jo.github.io/Cartilla_Digital';
+        const resetLink = `${frontendUrl}?reset_token=${token}`;
+        
+        if (resend) {
+            await resend.emails.send({
+                from: 'Cartilla Digital <onboarding@resend.dev>',
+                to: [email.trim().toLowerCase()],
+                subject: '🔐 Cartilla Digital - Recuperar Contraseña',
+                html: `
+                    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #f8f9fa; border-radius: 12px; overflow: hidden;">
+                        <div style="background: linear-gradient(135deg, #2563eb, #1e40af); padding: 32px 24px; text-align: center;">
+                            <h1 style="color: #fff; margin: 0; font-size: 22px;">🐾 Cartilla Digital</h1>
+                            <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px;">Recuperación de Contraseña</p>
+                        </div>
+                        <div style="padding: 32px 24px;">
+                            <p style="color: #333; font-size: 15px; line-height: 1.6;">Hola <strong>${vet.nombre}</strong>,</p>
+                            <p style="color: #333; font-size: 15px; line-height: 1.6;">Recibimos una solicitud para restablecer la contraseña de tu cuenta en Cartilla Digital.</p>
+                            <div style="text-align: center; margin: 28px 0;">
+                                <a href="${resetLink}" style="display: inline-block; background: linear-gradient(135deg, #2563eb, #1e40af); color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 15px;">Restablecer Contraseña</a>
+                            </div>
+                            <p style="color: #666; font-size: 13px; line-height: 1.5;">Este enlace expirará en <strong>15 minutos</strong>. Si no solicitaste este cambio, puedes ignorar este correo de forma segura.</p>
+                        </div>
+                        <div style="background: #e9ecef; padding: 16px 24px; text-align: center;">
+                            <p style="color: #888; font-size: 11px; margin: 0;">© ${new Date().getFullYear()} Cartilla Digital - Control Veterinario Preventivo</p>
+                        </div>
+                    </div>
+                `
+            });
+        } else {
+            console.log('⚠️  Resend no configurado. Token de recuperación generado:', token);
+            console.log('Enlace de recuperación:', resetLink);
+        }
+        
+        res.json({ mensaje: 'Si el correo está registrado, recibirás un enlace de recuperación.' });
+    } catch (err) {
+        console.error('Error en forgot-password:', err);
+        res.status(500).json({ error: 'Error al procesar la solicitud de recuperación.' });
+    }
+});
+
+/**
+ * Restablecer contraseña con token
+ */
+app.post('/api/auth/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+    
+    if (!token || !newPassword) {
+        return res.status(400).json({ error: 'Token y nueva contraseña son requeridos.' });
+    }
+    
+    if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+    }
+    
+    try {
+        // Buscar token válido
+        const result = await db.query(
+            'SELECT * FROM password_resets WHERE token = $1 AND usado = FALSE AND expira_en > NOW()',
+            [token]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'El enlace de recuperación es inválido o ha expirado. Solicita uno nuevo.' });
+        }
+        
+        const resetRecord = result.rows[0];
+        
+        // Encriptar nueva contraseña
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(newPassword, salt);
+        
+        // Actualizar contraseña
+        await db.query('UPDATE veterinarias SET password_hash = $1 WHERE id = $2', [passwordHash, resetRecord.veterinaria_id]);
+        
+        // Marcar token como usado
+        await db.query('UPDATE password_resets SET usado = TRUE WHERE id = $1', [resetRecord.id]);
+        
+        res.json({ mensaje: '¡Contraseña actualizada con éxito! Ya puedes iniciar sesión con tu nueva contraseña.' });
+    } catch (err) {
+        console.error('Error en reset-password:', err);
+        res.status(500).json({ error: 'Error al restablecer la contraseña.' });
+    }
+});
+
 // --- PERFIL DE VETERINARIA ---
 
 app.get('/api/veterinaria', authMiddleware, async (req, res) => {
@@ -147,7 +285,9 @@ app.put('/api/veterinaria', authMiddleware, async (req, res) => {
             WHERE id = $5
             RETURNING id, email, nombre, iniciales, telefono, direccion, logo_base64 AS logo
         `;
-        const values = [nombre.trim(), telefono, direccion, logo, req.veterinaria.id];
+        // Subir logo a Storage si es Base64
+        const logoFinal = await subirImagenAStorage(logo, 'logos');
+        const values = [nombre.trim(), telefono, direccion, logoFinal, req.veterinaria.id];
         const result = await db.query(queryText, values);
         
         res.json({ mensaje: 'Perfil actualizado con éxito.', veterinaria: result.rows[0] });
@@ -302,6 +442,7 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             RETURNING *
         `;
+        const fotoFinal = await subirImagenAStorage(foto, 'mascotas');
         const values = [
             codigoUnico,
             req.veterinaria.iniciales,
@@ -313,7 +454,7 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
             fechaNacimiento,
             color ? color.trim() : '',
             peso !== undefined && peso !== '' ? parseFloat(peso) : null,
-            foto || '',
+            fotoFinal || '',
             tutor.nombre.trim(),
             tutor.telefono ? tutor.telefono.trim() : '',
             tutor.direccion ? tutor.direccion.trim() : '',
@@ -465,7 +606,11 @@ app.put('/api/mascotas/:id', authMiddleware, async (req, res) => {
         const finalFechaNac = fechaNacimiento !== undefined ? fechaNacimiento : orig.fecha_nacimiento;
         const finalColor = color !== undefined ? color.trim() : orig.color;
         const finalPeso = peso !== undefined && peso !== '' ? parseFloat(peso) : (peso === '' ? null : orig.peso);
-        const finalFoto = foto !== undefined ? foto : orig.foto_base64;
+        let finalFoto = foto !== undefined ? foto : orig.foto_base64;
+        // Subir nueva foto a Storage si es Base64
+        if (foto !== undefined && foto && foto.startsWith('data:image/')) {
+            finalFoto = await subirImagenAStorage(foto, 'mascotas');
+        }
         const finalTutorNombre = tutor?.nombre !== undefined ? tutor.nombre.trim() : orig.tutor_nombre;
         const finalTutorTel = tutor?.telefono !== undefined ? tutor.telefono.trim() : orig.tutor_telefono;
         const finalTutorDir = tutor?.direccion !== undefined ? tutor.direccion.trim() : orig.tutor_direccion;
@@ -1163,6 +1308,74 @@ app.delete('/api/equipo/:id', authMiddleware, async (req, res) => {
     } catch (err) {
         console.error('Error al eliminar integrante:', err);
         res.status(500).json({ error: 'Error al eliminar integrante.' });
+    }
+});
+
+// --- SUBIDA DE IMÁGENES A SUPABASE STORAGE ---
+
+/**
+ * Helper: sube una imagen Base64 a Supabase Storage y devuelve la URL pública.
+ * Si Supabase no está configurado, devuelve el Base64 original.
+ */
+async function subirImagenAStorage(base64String, carpeta = 'general') {
+    // Si no es Base64 o Supabase no está configurado, devolver como está
+    if (!base64String || !base64String.startsWith('data:image/') || !supabase) {
+        return base64String;
+    }
+    
+    try {
+        // Extraer el tipo MIME y los datos
+        const matches = base64String.match(/^data:(image\/\w+);base64,(.+)$/);
+        if (!matches) return base64String;
+        
+        const mimeType = matches[1];
+        const extension = mimeType.split('/')[1] === 'jpeg' ? 'jpg' : mimeType.split('/')[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        
+        // Generar nombre único
+        const fileName = `${carpeta}/${crypto.randomUUID()}.${extension}`;
+        
+        // Subir a Supabase Storage
+        const { data, error } = await supabase.storage
+            .from('imagenes')
+            .upload(fileName, buffer, {
+                contentType: mimeType,
+                upsert: false
+            });
+        
+        if (error) {
+            console.error('Error al subir imagen a Supabase Storage:', error.message);
+            return base64String; // Fallback: devolver Base64
+        }
+        
+        // Obtener URL pública
+        const { data: publicUrlData } = supabase.storage
+            .from('imagenes')
+            .getPublicUrl(fileName);
+        
+        return publicUrlData.publicUrl;
+    } catch (err) {
+        console.error('Error procesando imagen para Storage:', err.message);
+        return base64String; // Fallback: devolver Base64
+    }
+}
+
+/**
+ * Endpoint para subir una imagen desde el frontend
+ */
+app.post('/api/upload-image', authMiddleware, async (req, res) => {
+    const { imagen, carpeta } = req.body;
+    
+    if (!imagen) {
+        return res.status(400).json({ error: 'No se recibió ninguna imagen.' });
+    }
+    
+    try {
+        const url = await subirImagenAStorage(imagen, carpeta || 'general');
+        res.json({ url });
+    } catch (err) {
+        console.error('Error al subir imagen:', err);
+        res.status(500).json({ error: 'Error al procesar la imagen.' });
     }
 });
 

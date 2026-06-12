@@ -60,3 +60,32 @@ function procesarYComprimirImagen(archivo, maxAncho, maxAlto, callback) {
     };
     lector.readAsDataURL(archivo);
 }
+
+/**
+ * Procesa, comprime y sube una imagen al servidor, devolviendo la URL pública.
+ * Si la subida falla o el usuario no está autenticado, devuelve el Base64 como fallback.
+ * 
+ * @param {File} archivo - Archivo de imagen desde un input de tipo file.
+ * @param {number} maxAncho - Ancho máximo en píxeles.
+ * @param {number} maxAlto - Alto máximo en píxeles.
+ * @param {string} carpeta - Carpeta de destino en Storage ('logos', 'mascotas', 'general').
+ * @param {function} callback - Función que se ejecuta al terminar, recibe la URL o Base64.
+ */
+function procesarComprimirYSubirImagen(archivo, maxAncho, maxAlto, carpeta, callback) {
+    procesarYComprimirImagen(archivo, maxAncho, maxAlto, async (base64) => {
+        // Intentar subir al servidor si el usuario está autenticado
+        if (API.isLoggedIn()) {
+            try {
+                const res = await API.uploadImage(base64, carpeta);
+                if (res && res.url) {
+                    callback(res.url);
+                    return;
+                }
+            } catch (err) {
+                console.warn('No se pudo subir imagen a Storage, usando Base64:', err.message);
+            }
+        }
+        // Fallback: devolver Base64
+        callback(base64);
+    });
+}

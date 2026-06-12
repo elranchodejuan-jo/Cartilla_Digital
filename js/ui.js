@@ -28,6 +28,8 @@ const DOM = {
     secciones: {
         login: document.getElementById('section-login'),
         registroClinica: document.getElementById('section-registro-clinica'),
+        forgotPassword: document.getElementById('section-forgot-password'),
+        resetPassword: document.getElementById('section-reset-password'),
         inicio: document.getElementById('section-inicio'),
         configuracion: document.getElementById('section-configuracion'),
         registrarMascota: document.getElementById('section-registrar-mascota'),
@@ -150,7 +152,7 @@ async function navegarA(seccionId) {
     }
     
     const vet = obtenerVeterinaria();
-    if (!API.isLoggedIn() && seccionId !== 'login' && seccionId !== 'registroClinica' && !UIState.modoPublico) {
+    if (!API.isLoggedIn() && seccionId !== 'login' && seccionId !== 'registroClinica' && seccionId !== 'forgotPassword' && seccionId !== 'resetPassword' && !UIState.modoPublico) {
         seccionId = 'login';
     } else if (API.isLoggedIn() && !vet && seccionId !== 'configuracion' && !UIState.modoPublico) {
         mostrarToast('Debe configurar la clínica veterinaria antes de continuar.', 'info');
@@ -206,15 +208,13 @@ function configurarSubidaArchivos() {
         logoInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    UIState.logoBase64 = event.target.result;
+                procesarComprimirYSubirImagen(file, 600, 600, 'logos', (urlOrBase64) => {
+                    UIState.logoBase64 = urlOrBase64;
                     if (logoPreview) {
-                        logoPreview.src = event.target.result;
+                        logoPreview.src = urlOrBase64;
                         logoPreview.style.display = 'block';
                     }
-                };
-                reader.readAsDataURL(file);
+                });
             }
         });
     }
@@ -226,10 +226,10 @@ function configurarSubidaArchivos() {
     
     function manejarSubidaFoto(file) {
         if (file) {
-            procesarYComprimirImagen(file, 400, 400, (base64) => {
-                UIState.fotoMascotaBase64 = base64;
+            procesarComprimirYSubirImagen(file, 400, 400, 'mascotas', (urlOrBase64) => {
+                UIState.fotoMascotaBase64 = urlOrBase64;
                 if (petPreview) {
-                    petPreview.src = base64;
+                    petPreview.src = urlOrBase64;
                     petPreview.style.display = 'block';
                 }
                 if (petPlaceholder) {
@@ -255,8 +255,8 @@ function configurarSubidaArchivos() {
         cartillaPhotoInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file && UIState.mascotaActivaId) {
-                procesarYComprimirImagen(file, 400, 400, async (base64) => {
-                    const exito = await actualizarMascota(UIState.mascotaActivaId, { foto: base64 });
+                procesarComprimirYSubirImagen(file, 400, 400, 'mascotas', async (urlOrBase64) => {
+                    const exito = await actualizarMascota(UIState.mascotaActivaId, { foto: urlOrBase64 });
                     if (exito) {
                         mostrarToast('Foto del paciente actualizada correctamente.', 'success');
                         await verCartillaMascota(UIState.mascotaActivaId);
@@ -1021,8 +1021,8 @@ function generarQRCartilla(mascota) {
         try {
             new QRCode(qrContainer, {
                 text: cartillaUrl,
-                width: 150,
-                height: 150,
+                width: 180,
+                height: 180,
                 colorDark: "#1C1C1E",
                 colorLight: "#FFFFFF",
                 correctLevel: QRCode.CorrectLevel.H
@@ -1089,7 +1089,13 @@ async function compartirWhatsApp() {
 }
 
 function imprimirCartilla() {
+    const originalTitle = document.title;
+    const petName = document.getElementById('cartilla-pet-name').textContent || '';
+    document.title = `Cartilla Digital - Paciente - ${petName}`;
     window.print();
+    setTimeout(() => {
+        document.title = originalTitle;
+    }, 500);
 }
 
 /**
@@ -1113,9 +1119,11 @@ function formatearFechaLocal(fechaStr) {
  */
 function obtenerFotoMascota(mascota) {
     if (mascota.foto) return mascota.foto;
-    const emoji = (mascota.especie || '').toLowerCase() === 'perro' ? '🐶' : '🐱';
-    const colorBg = (mascota.especie || '').toLowerCase() === 'perro' ? '#E8EAF6' : '#FCE4EC';
-    return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="${encodeURIComponent(colorBg)}"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="50">${emoji}</text></svg>`;
+    const especie = (mascota.especie || '').toLowerCase();
+    const emoji = especie === 'perro' ? '🐶' : (especie === 'gato' ? '🐱' : '🐾');
+    const colorBg = especie === 'perro' ? '#E8EAF6' : (especie === 'gato' ? '#FCE4EC' : '#E0E0E0');
+    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="${colorBg}"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="50">${emoji}</text></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svgStr)}`;
 }
 
 /**
@@ -1565,8 +1573,8 @@ function capturarFotoCamara() {
             manejarSubidaFoto(file);
         } else if (camaraContexto === 'cartilla') {
             if (UIState.mascotaActivaId) {
-                procesarYComprimirImagen(file, 400, 400, async (base64) => {
-                    const exito = await actualizarMascota(UIState.mascotaActivaId, { foto: base64 });
+                procesarComprimirYSubirImagen(file, 400, 400, 'mascotas', async (urlOrBase64) => {
+                    const exito = await actualizarMascota(UIState.mascotaActivaId, { foto: urlOrBase64 });
                     if (exito) {
                         mostrarToast('Foto del paciente actualizada correctamente.', 'success');
                         await verCartillaMascota(UIState.mascotaActivaId);
