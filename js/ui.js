@@ -1085,6 +1085,34 @@ async function compartirWhatsApp() {
                 `*Ficha Clínica:* ${mascota.codigo}\n\n` +
                 `Historial preventivo de vacunas, desparasitaciones y controles en: ${cartillaUrl}`;
                 
+    // Descargar el QR automáticamente
+    try {
+        const qrContainer = document.getElementById('qrcode');
+        if (qrContainer) {
+            let qrUrl = null;
+            const canvas = qrContainer.querySelector('canvas');
+            if (canvas) {
+                qrUrl = canvas.toDataURL('image/png');
+            } else {
+                const img = qrContainer.querySelector('img');
+                if (img && img.src) {
+                    qrUrl = img.src;
+                }
+            }
+            if (qrUrl) {
+                const a = document.createElement('a');
+                a.href = qrUrl;
+                a.download = `QR_Cartilla_${mascota.nombre}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                mostrarToast('Descargando QR para adjuntar en WhatsApp...', 'info');
+            }
+        }
+    } catch (e) {
+        console.error('No se pudo descargar el QR automáticamente', e);
+    }
+                
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(txt)}`, '_blank');
 }
 
