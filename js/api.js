@@ -241,6 +241,15 @@ const API = {
         return this.handleResponse(res);
     },
 
+    async actualizarStatusVacuna(mascotaId, vacunaId, status, fechaAsistencia) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/vacunas/${vacunaId}/status`, {
+            method: 'PATCH',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ status, fechaAsistencia })
+        });
+        return this.handleResponse(res);
+    },
+
     async eliminarVacuna(mascotaId, vacunaId) {
         const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/vacunas/${vacunaId}`, {
             method: 'DELETE',
@@ -264,6 +273,15 @@ const API = {
             method: 'PUT',
             headers: this.getHeaders(true),
             body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async actualizarStatusDesparasitacion(mascotaId, desparasitacionId, status, fechaAsistencia) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/desparasitaciones/${desparasitacionId}/status`, {
+            method: 'PATCH',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ status, fechaAsistencia })
         });
         return this.handleResponse(res);
     },
@@ -295,11 +313,72 @@ const API = {
         return this.handleResponse(res);
     },
 
+    async actualizarStatusControl(mascotaId, controlId, status, fechaAsistencia) {
+        const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/controles/${controlId}/status`, {
+            method: 'PATCH',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ status, fechaAsistencia })
+        });
+        return this.handleResponse(res);
+    },
+
     async eliminarControl(mascotaId, controlId) {
         const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/controles/${controlId}`, {
             method: 'DELETE',
             headers: this.getHeaders(true)
         });
+        return this.handleResponse(res);
+    },
+
+    // --- BANCOS CLÍNICOS ---
+    async obtenerBancoVacunas() {
+        const res = await fetch(`${API_BASE_URL}/banco/vacunas`, { method: 'GET', headers: this.getHeaders(true) });
+        return this.handleResponse(res);
+    },
+    async guardarBancoVacuna(datos) {
+        const res = await fetch(`${API_BASE_URL}/banco/vacunas`, { method: 'POST', headers: this.getHeaders(true), body: JSON.stringify(datos) });
+        return this.handleResponse(res);
+    },
+    async editarBancoVacuna(id, datos) {
+        const res = await fetch(`${API_BASE_URL}/banco/vacunas/${id}`, { method: 'PUT', headers: this.getHeaders(true), body: JSON.stringify(datos) });
+        return this.handleResponse(res);
+    },
+    async eliminarBancoVacuna(id) {
+        const res = await fetch(`${API_BASE_URL}/banco/vacunas/${id}`, { method: 'DELETE', headers: this.getHeaders(true) });
+        return this.handleResponse(res);
+    },
+
+    async obtenerBancoInternos() {
+        const res = await fetch(`${API_BASE_URL}/banco/internos`, { method: 'GET', headers: this.getHeaders(true) });
+        return this.handleResponse(res);
+    },
+    async guardarBancoInterno(datos) {
+        const res = await fetch(`${API_BASE_URL}/banco/internos`, { method: 'POST', headers: this.getHeaders(true), body: JSON.stringify(datos) });
+        return this.handleResponse(res);
+    },
+    async editarBancoInterno(id, datos) {
+        const res = await fetch(`${API_BASE_URL}/banco/internos/${id}`, { method: 'PUT', headers: this.getHeaders(true), body: JSON.stringify(datos) });
+        return this.handleResponse(res);
+    },
+    async eliminarBancoInterno(id) {
+        const res = await fetch(`${API_BASE_URL}/banco/internos/${id}`, { method: 'DELETE', headers: this.getHeaders(true) });
+        return this.handleResponse(res);
+    },
+
+    async obtenerBancoExternos() {
+        const res = await fetch(`${API_BASE_URL}/banco/externos`, { method: 'GET', headers: this.getHeaders(true) });
+        return this.handleResponse(res);
+    },
+    async guardarBancoExterno(datos) {
+        const res = await fetch(`${API_BASE_URL}/banco/externos`, { method: 'POST', headers: this.getHeaders(true), body: JSON.stringify(datos) });
+        return this.handleResponse(res);
+    },
+    async editarBancoExterno(id, datos) {
+        const res = await fetch(`${API_BASE_URL}/banco/externos/${id}`, { method: 'PUT', headers: this.getHeaders(true), body: JSON.stringify(datos) });
+        return this.handleResponse(res);
+    },
+    async eliminarBancoExterno(id) {
+        const res = await fetch(`${API_BASE_URL}/banco/externos/${id}`, { method: 'DELETE', headers: this.getHeaders(true) });
         return this.handleResponse(res);
     },
 

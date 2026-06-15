@@ -428,8 +428,8 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
         // 2. Generar el código único de cartilla
         let especieCodigo = "O";
         const espLower = especie.toLowerCase().trim();
-        if (espLower === "perro") especieCodigo = "P";
-        else if (espLower === "gato") especieCodigo = "G";
+        if (espLower === "perro" || espLower === "canino") especieCodigo = "P";
+        else if (espLower === "gato" || espLower === "felino") especieCodigo = "G";
         
         const fechaCodigo = formatearFechaAAMMDD(hoy);
         const contadorStr = correlativo < 100 ? String(correlativo).padStart(2, "0") : String(correlativo);
@@ -517,7 +517,9 @@ app.get('/api/mascotas/:id', authMiddleware, async (req, res) => {
             proximaDosis: v.proxima_dosis ? v.proxima_dosis.toISOString().split('T')[0] : '',
             lote: v.lote || '',
             responsable: v.responsable,
-            observaciones: v.observaciones || ''
+            observaciones: v.observaciones || '',
+            status: v.status || 'pendiente',
+            fechaAsistencia: v.fecha_asistencia ? v.fecha_asistencia.toISOString().split('T')[0] : null
         }));
         
         // Obtener desparasitaciones
@@ -534,7 +536,9 @@ app.get('/api/mascotas/:id', authMiddleware, async (req, res) => {
             dosis: d.dosis || '',
             via: d.via || 'Oral',
             responsable: d.responsable,
-            observaciones: d.observaciones || ''
+            observaciones: d.observaciones || '',
+            status: d.status || 'pendiente',
+            fechaAsistencia: d.fecha_asistencia ? d.fecha_asistencia.toISOString().split('T')[0] : null
         }));
         
         // Obtener controles
@@ -551,7 +555,9 @@ app.get('/api/mascotas/:id', authMiddleware, async (req, res) => {
             diagnostico: c.diagnostico || '',
             tratamiento: c.tratamiento || '',
             recomendaciones: c.recomendaciones || '',
-            proximoControl: c.proximo_control ? c.proximo_control.toISOString().split('T')[0] : ''
+            proximoControl: c.proximo_control ? c.proximo_control.toISOString().split('T')[0] : '',
+            status: c.status || 'pendiente',
+            fechaAsistencia: c.fecha_asistencia ? c.fecha_asistencia.toISOString().split('T')[0] : null
         }));
         
         res.json({
@@ -658,7 +664,7 @@ app.delete('/api/mascotas/:id', authMiddleware, async (req, res) => {
 
 app.post('/api/mascotas/:id/vacunas', authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { nombre, enfermedades, laboratorio, fechaAplicacion, proximaDosis, lote, responsable, responsableId, observaciones } = req.body;
+    const { nombre, enfermedades, laboratorio, fechaAplicacion, proximaDosis, lote, responsable, responsableId, observaciones, status, fechaAsistencia } = req.body;
     
     if (!nombre || !fechaAplicacion || !responsable) {
         return res.status(400).json({ error: 'Nombre, fecha de aplicación y responsable son obligatorios.' });
@@ -671,8 +677,8 @@ app.post('/api/mascotas/:id/vacunas', authMiddleware, async (req, res) => {
         }
         
         const queryText = `
-            INSERT INTO vacunas (mascota_id, nombre, enfermedades, laboratorio, fecha_aplicacion, proxima_dosis, lote, responsable, responsable_id, observaciones)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            INSERT INTO vacunas (mascota_id, nombre, enfermedades, laboratorio, fecha_aplicacion, proxima_dosis, lote, responsable, responsable_id, observaciones, status, fecha_asistencia)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         `;
         const values = [
             id,
@@ -684,7 +690,9 @@ app.post('/api/mascotas/:id/vacunas', authMiddleware, async (req, res) => {
             lote ? lote.trim() : '',
             responsable.trim(),
             responsableId || null,
-            observaciones ? observaciones.trim() : ''
+            observaciones ? observaciones.trim() : '',
+            status || 'pendiente',
+            fechaAsistencia || null
         ];
         
         await db.query(queryText, values);
@@ -697,7 +705,7 @@ app.post('/api/mascotas/:id/vacunas', authMiddleware, async (req, res) => {
 
 app.put('/api/mascotas/:id/vacunas/:vacunaId', authMiddleware, async (req, res) => {
     const { id, vacunaId } = req.params;
-    const { nombre, enfermedades, laboratorio, fechaAplicacion, proximaDosis, lote, responsable, responsableId, observaciones } = req.body;
+    const { nombre, enfermedades, laboratorio, fechaAplicacion, proximaDosis, lote, responsable, responsableId, observaciones, status, fechaAsistencia } = req.body;
     
     try {
         const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
@@ -707,10 +715,10 @@ app.put('/api/mascotas/:id/vacunas/:vacunaId', authMiddleware, async (req, res) 
         
         const queryText = `
             UPDATE vacunas
-            SET nombre = $1, enfermedades = $2, laboratorio = $3, fecha_aplicacion = $4, proxima_dosis = $5, lote = $6, responsable = $7, responsable_id = $8, observaciones = $9
-            WHERE id = $10 AND mascota_id = $11
+            SET nombre = $1, enfermedades = $2, laboratorio = $3, fecha_aplicacion = $4, proxima_dosis = $5, lote = $6, responsable = $7, responsable_id = $8, observaciones = $9, status = $10, fecha_asistencia = $11
+            WHERE id = $12 AND mascota_id = $13
         `;
-        const values = [nombre.trim(), enfermedades, laboratorio, fechaAplicacion, proximaDosis || null, lote, responsable, responsableId || null, observaciones, vacunaId, id];
+        const values = [nombre.trim(), enfermedades, laboratorio, fechaAplicacion, proximaDosis || null, lote, responsable, responsableId || null, observaciones, status || 'pendiente', fechaAsistencia || null, vacunaId, id];
         const result = await db.query(queryText, values);
         
         if (result.rowCount === 0) {
@@ -721,6 +729,34 @@ app.put('/api/mascotas/:id/vacunas/:vacunaId', authMiddleware, async (req, res) 
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Error al actualizar la vacuna.' });
+    }
+});
+
+app.patch('/api/mascotas/:id/vacunas/:vacunaId/status', authMiddleware, async (req, res) => {
+    const { id, vacunaId } = req.params;
+    const { status, fechaAsistencia } = req.body;
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        
+        const queryText = `
+            UPDATE vacunas
+            SET status = $1, fecha_asistencia = $2
+            WHERE id = $3 AND mascota_id = $4
+        `;
+        const result = await db.query(queryText, [status, fechaAsistencia || null, vacunaId, id]);
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Vacuna no encontrada.' });
+        }
+        
+        res.json({ mensaje: 'Estado de vacuna actualizado.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar estado.' });
     }
 });
 
@@ -751,7 +787,7 @@ app.delete('/api/mascotas/:id/vacunas/:vacunaId', authMiddleware, async (req, re
 
 app.post('/api/mascotas/:id/desparasitaciones', authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { tipo, producto, tipoProducto, rangoPeso, parasitosCubre, fechaAplicacion, proximaAplicacion, dosis, via, responsable, responsableId, observaciones } = req.body;
+    const { tipo, producto, tipoProducto, rangoPeso, parasitosCubre, fechaAplicacion, proximaAplicacion, dosis, via, responsable, responsableId, observaciones, status, fechaAsistencia } = req.body;
     
     if (!producto || !fechaAplicacion || !responsable) {
         return res.status(400).json({ error: 'Producto, fecha de aplicación y responsable son obligatorios.' });
@@ -764,8 +800,8 @@ app.post('/api/mascotas/:id/desparasitaciones', authMiddleware, async (req, res)
         }
         
         const queryText = `
-            INSERT INTO desparasitaciones (mascota_id, tipo, producto, tipo_producto, rango_peso, parasitos_cubre, fecha_aplicacion, proxima_aplicacion, dosis, via, responsable, responsable_id, observaciones)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            INSERT INTO desparasitaciones (mascota_id, tipo, producto, tipo_producto, rango_peso, parasitos_cubre, fecha_aplicacion, proxima_aplicacion, dosis, via, responsable, responsable_id, observaciones, status, fecha_asistencia)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         `;
         const values = [
             id,
@@ -780,7 +816,9 @@ app.post('/api/mascotas/:id/desparasitaciones', authMiddleware, async (req, res)
             via || 'Oral',
             responsable.trim(),
             responsableId || null,
-            observaciones ? observaciones.trim() : ''
+            observaciones ? observaciones.trim() : '',
+            status || 'pendiente',
+            fechaAsistencia || null
         ];
         
         await db.query(queryText, values);
@@ -793,7 +831,7 @@ app.post('/api/mascotas/:id/desparasitaciones', authMiddleware, async (req, res)
 
 app.put('/api/mascotas/:id/desparasitaciones/:desparasitacionId', authMiddleware, async (req, res) => {
     const { id, desparasitacionId } = req.params;
-    const { tipo, producto, tipoProducto, rangoPeso, parasitosCubre, fechaAplicacion, proximaAplicacion, dosis, via, responsable, responsableId, observaciones } = req.body;
+    const { tipo, producto, tipoProducto, rangoPeso, parasitosCubre, fechaAplicacion, proximaAplicacion, dosis, via, responsable, responsableId, observaciones, status, fechaAsistencia } = req.body;
     
     try {
         const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
@@ -803,10 +841,10 @@ app.put('/api/mascotas/:id/desparasitaciones/:desparasitacionId', authMiddleware
         
         const queryText = `
             UPDATE desparasitaciones
-            SET tipo = $1, producto = $2, tipo_producto = $3, rango_peso = $4, parasitos_cubre = $5, fecha_aplicacion = $6, proxima_aplicacion = $7, dosis = $8, via = $9, responsable = $10, responsable_id = $11, observaciones = $12
-            WHERE id = $13 AND mascota_id = $14
+            SET tipo = $1, producto = $2, tipo_producto = $3, rango_peso = $4, parasitos_cubre = $5, fecha_aplicacion = $6, proxima_aplicacion = $7, dosis = $8, via = $9, responsable = $10, responsable_id = $11, observaciones = $12, status = $13, fecha_asistencia = $14
+            WHERE id = $15 AND mascota_id = $16
         `;
-        const values = [tipo || 'interna', producto.trim(), tipoProducto, rangoPeso, parasitosCubre, fechaAplicacion, proximaAplicacion || null, dosis, via, responsable, responsableId || null, observaciones, desparasitacionId, id];
+        const values = [tipo || 'interna', producto.trim(), tipoProducto, rangoPeso, parasitosCubre, fechaAplicacion, proximaAplicacion || null, dosis, via, responsable, responsableId || null, observaciones, status || 'pendiente', fechaAsistencia || null, desparasitacionId, id];
         const result = await db.query(queryText, values);
         
         if (result.rowCount === 0) {
@@ -816,6 +854,34 @@ app.put('/api/mascotas/:id/desparasitaciones/:desparasitacionId', authMiddleware
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Error al actualizar desparasitación.' });
+    }
+});
+
+app.patch('/api/mascotas/:id/desparasitaciones/:desparasitacionId/status', authMiddleware, async (req, res) => {
+    const { id, desparasitacionId } = req.params;
+    const { status, fechaAsistencia } = req.body;
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        
+        const queryText = `
+            UPDATE desparasitaciones
+            SET status = $1, fecha_asistencia = $2
+            WHERE id = $3 AND mascota_id = $4
+        `;
+        const result = await db.query(queryText, [status, fechaAsistencia || null, desparasitacionId, id]);
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Desparasitación no encontrada.' });
+        }
+        
+        res.json({ mensaje: 'Estado de desparasitación actualizado.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar estado.' });
     }
 });
 
@@ -846,7 +912,7 @@ app.delete('/api/mascotas/:id/desparasitaciones/:desparasitacionId', authMiddlew
 
 app.post('/api/mascotas/:id/controles', authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximoControl, responsable, responsableId } = req.body;
+    const { fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximoControl, responsable, responsableId, status, fechaAsistencia } = req.body;
     
     if (!motivo || !responsable) {
         return res.status(400).json({ error: 'El motivo y el responsable son obligatorios.' });
@@ -861,8 +927,8 @@ app.post('/api/mascotas/:id/controles', authMiddleware, async (req, res) => {
         await db.query('BEGIN');
         
         const queryText = `
-            INSERT INTO controles (mascota_id, fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximo_control, responsable, responsable_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            INSERT INTO controles (mascota_id, fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximo_control, responsable, responsable_id, status, fecha_asistencia)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         `;
         const values = [
             id,
@@ -878,7 +944,9 @@ app.post('/api/mascotas/:id/controles', authMiddleware, async (req, res) => {
             recomendaciones || '',
             proximoControl || null,
             responsable.trim(),
-            responsableId || null
+            responsableId || null,
+            status || 'pendiente',
+            fechaAsistencia || null
         ];
         
         await db.query(queryText, values);
@@ -899,7 +967,7 @@ app.post('/api/mascotas/:id/controles', authMiddleware, async (req, res) => {
 
 app.put('/api/mascotas/:id/controles/:controlId', authMiddleware, async (req, res) => {
     const { id, controlId } = req.params;
-    const { fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximoControl, responsable, responsableId } = req.body;
+    const { fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximoControl, responsable, responsableId, status, fechaAsistencia } = req.body;
     
     if (!motivo || !responsable) {
         return res.status(400).json({ error: 'El motivo y el responsable son obligatorios.' });
@@ -915,8 +983,8 @@ app.put('/api/mascotas/:id/controles/:controlId', authMiddleware, async (req, re
         
         const queryText = `
             UPDATE controles
-            SET fecha = $1, motivo = $2, peso = $3, temperatura = $4, fc = $5, fr = $6, hallazgos = $7, diagnostico = $8, tratamiento = $9, recomendaciones = $10, proximo_control = $11, responsable = $12, responsable_id = $13
-            WHERE id = $14 AND mascota_id = $15
+            SET fecha = $1, motivo = $2, peso = $3, temperatura = $4, fc = $5, fr = $6, hallazgos = $7, diagnostico = $8, tratamiento = $9, recomendaciones = $10, proximo_control = $11, responsable = $12, responsable_id = $13, status = $14, fecha_asistencia = $15
+            WHERE id = $16 AND mascota_id = $17
         `;
         const values = [
             fecha || new Date().toISOString().split('T')[0],
@@ -932,6 +1000,8 @@ app.put('/api/mascotas/:id/controles/:controlId', authMiddleware, async (req, re
             proximoControl || null,
             responsable.trim(),
             responsableId || null,
+            status || 'pendiente',
+            fechaAsistencia || null,
             controlId,
             id
         ];
@@ -962,6 +1032,34 @@ app.put('/api/mascotas/:id/controles/:controlId', authMiddleware, async (req, re
         await db.query('ROLLBACK');
         console.error(err);
         res.status(500).json({ error: 'Error al actualizar control.' });
+    }
+});
+
+app.patch('/api/mascotas/:id/controles/:controlId/status', authMiddleware, async (req, res) => {
+    const { id, controlId } = req.params;
+    const { status, fechaAsistencia } = req.body;
+    
+    try {
+        const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
+        if (mCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Mascota no encontrada.' });
+        }
+        
+        const queryText = `
+            UPDATE controles
+            SET status = $1, fecha_asistencia = $2
+            WHERE id = $3 AND mascota_id = $4
+        `;
+        const result = await db.query(queryText, [status, fechaAsistencia || null, controlId, id]);
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Control no encontrado.' });
+        }
+        
+        res.json({ mensaje: 'Estado de control actualizado.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar estado.' });
     }
 });
 
@@ -1359,6 +1457,175 @@ async function subirImagenAStorage(base64String, carpeta = 'general') {
         return base64String; // Fallback: devolver Base64
     }
 }
+// ==========================================
+// BANCOS CLÍNICOS
+// ==========================================
+
+// Vacunas
+app.get('/api/banco/vacunas', authMiddleware, async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM banco_vacunas WHERE veterinaria_id = $1 ORDER BY nombre ASC', [req.veterinaria.id]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al obtener banco de vacunas.' });
+    }
+});
+
+app.post('/api/banco/vacunas', authMiddleware, async (req, res) => {
+    const { nombre, especie, enfermedades, laboratorio, lote, frecuencia, observaciones } = req.body;
+    try {
+        const result = await db.query(
+            `INSERT INTO banco_vacunas (veterinaria_id, nombre, especie, enfermedades, laboratorio, lote, frecuencia, observaciones)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+            [req.veterinaria.id, nombre.trim(), especie || 'Ambos', enfermedades, laboratorio, lote, frecuencia, observaciones]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al agregar vacuna al banco.' });
+    }
+});
+
+app.put('/api/banco/vacunas/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const { nombre, especie, enfermedades, laboratorio, lote, frecuencia, observaciones } = req.body;
+    try {
+        const result = await db.query(
+            `UPDATE banco_vacunas 
+             SET nombre = $1, especie = $2, enfermedades = $3, laboratorio = $4, lote = $5, frecuencia = $6, observaciones = $7
+             WHERE id = $8 AND veterinaria_id = $9 RETURNING *`,
+            [nombre.trim(), especie || 'Ambos', enfermedades, laboratorio, lote, frecuencia, observaciones, id, req.veterinaria.id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Item no encontrado' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar vacuna del banco.' });
+    }
+});
+
+app.delete('/api/banco/vacunas/:id', authMiddleware, async (req, res) => {
+    try {
+        const result = await db.query('DELETE FROM banco_vacunas WHERE id = $1 AND veterinaria_id = $2', [req.params.id, req.veterinaria.id]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Item no encontrado' });
+        res.json({ mensaje: 'Item eliminado' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al eliminar vacuna del banco.' });
+    }
+});
+
+// Internos
+app.get('/api/banco/internos', authMiddleware, async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM banco_internos WHERE veterinaria_id = $1 ORDER BY nombre ASC', [req.veterinaria.id]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al obtener banco de desparasitantes internos.' });
+    }
+});
+
+app.post('/api/banco/internos', authMiddleware, async (req, res) => {
+    const { nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones } = req.body;
+    try {
+        const result = await db.query(
+            `INSERT INTO banco_internos (veterinaria_id, nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [req.veterinaria.id, nombre.trim(), especie || 'Ambos', tipo, rango_peso, parasitos, dosis, via, observaciones]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al agregar interno al banco.' });
+    }
+});
+
+app.put('/api/banco/internos/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const { nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones } = req.body;
+    try {
+        const result = await db.query(
+            `UPDATE banco_internos 
+             SET nombre = $1, especie = $2, tipo = $3, rango_peso = $4, parasitos = $5, dosis = $6, via = $7, observaciones = $8
+             WHERE id = $9 AND veterinaria_id = $10 RETURNING *`,
+            [nombre.trim(), especie || 'Ambos', tipo, rango_peso, parasitos, dosis, via, observaciones, id, req.veterinaria.id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Item no encontrado' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar interno del banco.' });
+    }
+});
+
+app.delete('/api/banco/internos/:id', authMiddleware, async (req, res) => {
+    try {
+        const result = await db.query('DELETE FROM banco_internos WHERE id = $1 AND veterinaria_id = $2', [req.params.id, req.veterinaria.id]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Item no encontrado' });
+        res.json({ mensaje: 'Item eliminado' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al eliminar interno del banco.' });
+    }
+});
+
+// Externos
+app.get('/api/banco/externos', authMiddleware, async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM banco_externos WHERE veterinaria_id = $1 ORDER BY nombre ASC', [req.veterinaria.id]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al obtener banco de desparasitantes externos.' });
+    }
+});
+
+app.post('/api/banco/externos', authMiddleware, async (req, res) => {
+    const { nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones } = req.body;
+    try {
+        const result = await db.query(
+            `INSERT INTO banco_externos (veterinaria_id, nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [req.veterinaria.id, nombre.trim(), especie || 'Ambos', tipo, rango_peso, parasitos, dosis, via, observaciones]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al agregar externo al banco.' });
+    }
+});
+
+app.put('/api/banco/externos/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const { nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones } = req.body;
+    try {
+        const result = await db.query(
+            `UPDATE banco_externos 
+             SET nombre = $1, especie = $2, tipo = $3, rango_peso = $4, parasitos = $5, dosis = $6, via = $7, observaciones = $8
+             WHERE id = $9 AND veterinaria_id = $10 RETURNING *`,
+            [nombre.trim(), especie || 'Ambos', tipo, rango_peso, parasitos, dosis, via, observaciones, id, req.veterinaria.id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Item no encontrado' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al actualizar externo del banco.' });
+    }
+});
+
+app.delete('/api/banco/externos/:id', authMiddleware, async (req, res) => {
+    try {
+        const result = await db.query('DELETE FROM banco_externos WHERE id = $1 AND veterinaria_id = $2', [req.params.id, req.veterinaria.id]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Item no encontrado' });
+        res.json({ mensaje: 'Item eliminado' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al eliminar externo del banco.' });
+    }
+});
+
 
 /**
  * Endpoint para subir una imagen desde el frontend

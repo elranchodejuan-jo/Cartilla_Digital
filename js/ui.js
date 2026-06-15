@@ -23,6 +23,14 @@ const UIState = {
     modoPublico: false // Si es true, oculta navegación y formularios
 };
 
+function mapearEspecie(especieStr) {
+    if (!especieStr) return 'Mascota';
+    const esp = especieStr.toLowerCase().trim();
+    if (esp === 'perro' || esp === 'p') return 'Canino';
+    if (esp === 'gato' || esp === 'g') return 'Felino';
+    return especieStr.charAt(0).toUpperCase() + especieStr.slice(1);
+}
+
 // Referencias del DOM
 const DOM = {
     secciones: {
@@ -235,9 +243,44 @@ function configurarSubidaArchivos() {
                 if (petPlaceholder) {
                     petPlaceholder.style.display = 'none';
                 }
+                const btnEliminar = document.getElementById('btn-eliminar-foto-mascota');
+                if (btnEliminar) btnEliminar.style.display = 'block';
             });
         }
     }
+    
+    window.eliminarFotoMascotaFormulario = function() {
+        if(confirm('¿Estás seguro de eliminar la foto seleccionada?')) {
+            UIState.fotoMascotaBase64 = null;
+            if (petPreview) {
+                petPreview.src = '';
+                petPreview.style.display = 'none';
+            }
+            if (petPlaceholder) {
+                petPlaceholder.style.display = 'block';
+            }
+            const btnEliminar = document.getElementById('btn-eliminar-foto-mascota');
+            if (btnEliminar) btnEliminar.style.display = 'none';
+            // También limpiar el input de archivo por si quieren re-seleccionar la misma
+            if(petGallery) petGallery.value = '';
+        }
+    };
+    
+    window.eliminarFotoMascotaCartilla = async function() {
+        if (!UIState.mascotaActivaId) return;
+        if(confirm('¿Deseas eliminar la foto de este paciente? Esto se guardará inmediatamente.')) {
+            mostrarToast('Eliminando foto...', 'info');
+            const exito = await editarMascota(UIState.mascotaActivaId, { foto: null });
+            if (exito) {
+                mostrarToast('Foto eliminada correctamente.', 'success');
+                const btnEliminarCartilla = document.getElementById('btn-eliminar-foto-cartilla');
+                if (btnEliminarCartilla) btnEliminarCartilla.style.display = 'none';
+                await cargarPerfilMascota(UIState.mascotaActivaId); // Recargar perfil
+            } else {
+                mostrarToast('Error al eliminar la foto.', 'error');
+            }
+        }
+    };
     
     if (petGallery) {
         petGallery.addEventListener('change', (e) => {
@@ -299,12 +342,16 @@ function prepararFormularioMascota() {
     
     const preview = document.getElementById('pet-photo-preview');
     const placeholder = document.getElementById('pet-photo-placeholder');
+    const btnEliminar = document.getElementById('btn-eliminar-foto-mascota');
     if (preview) {
         preview.style.display = 'none';
         preview.src = '';
     }
     if (placeholder) {
         placeholder.style.display = 'block';
+    }
+    if (btnEliminar) {
+        btnEliminar.style.display = 'none';
     }
     
     // Inicializar datalist de razas
@@ -431,8 +478,14 @@ function cerrarModal(modalId) {
 async function renderizarDashboard() {
     const mascotas = await obtenerMascotas();
     const total = mascotas.length;
-    const perros = mascotas.filter(m => m.especie.toLowerCase() === 'perro').length;
-    const gatos = mascotas.filter(m => m.especie.toLowerCase() === 'gato').length;
+    const perros = mascotas.filter(m => {
+        const esp = (m.especie || '').toLowerCase();
+        return esp === 'perro' || esp === 'canino' || esp === 'p';
+    }).length;
+    const gatos = mascotas.filter(m => {
+        const esp = (m.especie || '').toLowerCase();
+        return esp === 'gato' || esp === 'felino' || esp === 'g';
+    }).length;
     
     let vacunasProximas = 0;
     let desparasitacionesProximas = 0;
@@ -597,7 +650,7 @@ async function renderizarListadoPacientes() {
                         <img src="${avatar}" class="patient-avatar" alt="${mascota.nombre}">
                         <div class="patient-header-info">
                             <h3 class="patient-name">${mascota.nombre}</h3>
-                            <span class="patient-badge ${especieClase}">${mascota.especie}</span>
+                            <span class="patient-badge ${especieClase}">${mapearEspecie(mascota.especie)}</span>
                         </div>
                     </div>
                     <div class="patient-card-body">
@@ -662,17 +715,20 @@ async function prepararEdicionMascota(id) {
     UIState.fotoMascotaBase64 = mascota.foto || '';
     const preview = document.getElementById('pet-photo-preview');
     const placeholder = document.getElementById('pet-photo-placeholder');
+    const btnEliminar = document.getElementById('btn-eliminar-foto-mascota');
     
     if (preview && mascota.foto) {
         preview.src = mascota.foto;
         preview.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
+        if (btnEliminar) btnEliminar.style.display = 'block';
     } else {
         if (preview) {
             preview.style.display = 'none';
             preview.src = '';
         }
         if (placeholder) placeholder.style.display = 'block';
+        if (btnEliminar) btnEliminar.style.display = 'none';
     }
     
     const datalistRazas = document.getElementById('datalist-razas');
@@ -727,8 +783,13 @@ async function verCartillaMascota(id) {
     
     // Mascota
     document.getElementById('cartilla-pet-photo').src = obtenerFotoMascota(mascota);
+    const btnEliminarCartilla = document.getElementById('btn-eliminar-foto-cartilla');
+    if (btnEliminarCartilla) {
+        btnEliminarCartilla.style.display = mascota.foto ? 'block' : 'none';
+    }
+    
     document.getElementById('cartilla-pet-name').textContent = mascota.nombre;
-    document.getElementById('cartilla-pet-especie').textContent = mascota.especie;
+    document.getElementById('cartilla-pet-especie').textContent = mapearEspecie(mascota.especie);
     document.getElementById('cartilla-pet-raza').textContent = mascota.raza || 'Mestizo';
     document.getElementById('cartilla-pet-sexo').textContent = mascota.sexo;
     document.getElementById('cartilla-pet-edad').textContent = calcularEdadMascota(mascota.fechaNacimiento);
@@ -779,12 +840,19 @@ function renderizarHistorialesCartilla(mascota) {
     }
 
     if (vacunas.length === 0) {
-        vBody.innerHTML = `<tr><td colspan="6" class="empty-state">No hay vacunas registradas en la cartilla.</td></tr>`;
+        vBody.innerHTML = `<tr><td colspan="8" class="empty-state">No hay vacunas registradas en la cartilla.</td></tr>`;
     } else {
         const ordenadas = [...vacunas].sort((a,b) => new Date(b.fechaAplicacion) - new Date(a.fechaAplicacion));
         vBody.innerHTML = ordenadas.map(v => {
             const ev = evaluarEstadoVacuna(v.proximaDosis);
             const badgeClass = ev.status === 'success' ? 'success' : ev.status === 'warning' ? 'warning' : ev.status === 'danger' ? 'danger' : '';
+            
+            let statusBadge = '';
+            if (v.status === 'asistio') statusBadge = '<span class="status-badge success">Asistió</span>';
+            else if (v.status === 'no_asistio') statusBadge = '<span class="status-badge danger">No Asistió</span>';
+            else if (v.status === 'reagendado') statusBadge = '<span class="status-badge warning">Reagendado</span>';
+            else statusBadge = '<span class="status-badge" style="background:var(--text-muted);">Pendiente</span>';
+
             return `
                 <tr>
                     <td data-label="Vacuna">
@@ -802,7 +870,11 @@ function renderizarHistorialesCartilla(mascota) {
                         ${v.laboratorio ? `<br><small style="color:var(--text-muted); font-size:11px;">${v.laboratorio}</small>` : ''}
                     </td>
                     <td data-label="Obs."><span style="font-size:12px; color:var(--text-muted);">${v.observaciones || ''}</span></td>
+                    <td data-label="Estado">${statusBadge}</td>
                     <td class="no-print no-public" data-label="Acciones">
+                        <div class="dropdown" style="display:inline-block; margin-right:4px;">
+                            <button class="btn btn-secondary btn-icon-only" title="Cambiar Estado" onclick="abrirMenuEstado(this, 'vacuna', '${v.id}')">🗓️</button>
+                        </div>
                         <button class="btn btn-secondary btn-icon-only" onclick="abrirEditarVacuna('${v.id}')" title="Editar">✏️</button>
                         <button class="btn btn-danger btn-icon-only" onclick="confirmarEliminarVacuna('${v.id}')" title="Eliminar">🗑️</button>
                     </td>
@@ -840,12 +912,19 @@ function renderizarHistorialesCartilla(mascota) {
     // Render Internas
     if (dIntBody) {
         if (desparasitacionesInternas.length === 0) {
-            dIntBody.innerHTML = `<tr><td colspan="7" class="empty-state">No hay desparasitaciones internas registradas.</td></tr>`;
+            dIntBody.innerHTML = `<tr><td colspan="9" class="empty-state">No hay desparasitaciones internas registradas.</td></tr>`;
         } else {
             const ordenadas = [...desparasitacionesInternas].sort((a,b) => new Date(b.fechaAplicacion) - new Date(a.fechaAplicacion));
             dIntBody.innerHTML = ordenadas.map(d => {
                 const ed = evaluarEstadoDesparasitacion(d.proximaAplicacion);
                 const badgeClass = ed.status === 'success' ? 'success' : ed.status === 'warning' ? 'warning' : ed.status === 'danger' ? 'danger' : '';
+                
+                let statusBadge = '';
+                if (d.status === 'asistio') statusBadge = '<span class="status-badge success">Asistió</span>';
+                else if (d.status === 'no_asistio') statusBadge = '<span class="status-badge danger">No Asistió</span>';
+                else if (d.status === 'reagendado') statusBadge = '<span class="status-badge warning">Reagendado</span>';
+                else statusBadge = '<span class="status-badge" style="background:var(--text-muted);">Pendiente</span>';
+
                 return `
                     <tr>
                         <td data-label="Producto"><strong>${d.producto}</strong></td>
@@ -858,7 +937,11 @@ function renderizarHistorialesCartilla(mascota) {
                         <td data-label="Vía">${d.via || 'Oral'}</td>
                         <td data-label="Veterinario">${d.responsable}</td>
                         <td data-label="Obs."><span style="font-size:12px; color:var(--text-muted);">${d.observaciones || ''}</span></td>
+                        <td data-label="Estado">${statusBadge}</td>
                         <td class="no-print no-public" data-label="Acciones">
+                            <div class="dropdown" style="display:inline-block; margin-right:4px;">
+                                <button class="btn btn-secondary btn-icon-only" title="Cambiar Estado" onclick="abrirMenuEstado(this, 'desparasitacion', '${d.id}')">🗓️</button>
+                            </div>
                             <button class="btn btn-secondary btn-icon-only" onclick="abrirEditarDesparasitacionInterna('${d.id}')" title="Editar">✏️</button>
                             <button class="btn btn-danger btn-icon-only" onclick="confirmarEliminarDesparasitacion('${d.id}')" title="Eliminar">🗑️</button>
                         </td>
@@ -871,12 +954,19 @@ function renderizarHistorialesCartilla(mascota) {
     // Render Externas
     if (dExtBody) {
         if (desparasitacionesExternas.length === 0) {
-            dExtBody.innerHTML = `<tr><td colspan="8" class="empty-state">No hay controles antiparasitarios externos registrados.</td></tr>`;
+            dExtBody.innerHTML = `<tr><td colspan="10" class="empty-state">No hay controles antiparasitarios externos registrados.</td></tr>`;
         } else {
             const ordenadas = [...desparasitacionesExternas].sort((a,b) => new Date(b.fechaAplicacion) - new Date(a.fechaAplicacion));
             dExtBody.innerHTML = ordenadas.map(d => {
                 const ed = evaluarEstadoDesparasitacion(d.proximaAplicacion);
                 const badgeClass = ed.status === 'success' ? 'success' : ed.status === 'warning' ? 'warning' : ed.status === 'danger' ? 'danger' : '';
+                
+                let statusBadge = '';
+                if (d.status === 'asistio') statusBadge = '<span class="status-badge success">Asistió</span>';
+                else if (d.status === 'no_asistio') statusBadge = '<span class="status-badge danger">No Asistió</span>';
+                else if (d.status === 'reagendado') statusBadge = '<span class="status-badge warning">Reagendado</span>';
+                else statusBadge = '<span class="status-badge" style="background:var(--text-muted);">Pendiente</span>';
+
                 return `
                     <tr>
                         <td data-label="Producto"><strong>${d.producto}</strong></td>
@@ -890,7 +980,11 @@ function renderizarHistorialesCartilla(mascota) {
                         <td data-label="Parásitos Cubiertos"><span style="font-size:12px;">${d.parasitosCubre || 'N/A'}</span></td>
                         <td data-label="Veterinario">${d.responsable}</td>
                         <td data-label="Obs."><span style="font-size:12px; color:var(--text-muted);">${d.observaciones || ''}</span></td>
+                        <td data-label="Estado">${statusBadge}</td>
                         <td class="no-print no-public" data-label="Acciones">
+                            <div class="dropdown" style="display:inline-block; margin-right:4px;">
+                                <button class="btn btn-secondary btn-icon-only" title="Cambiar Estado" onclick="abrirMenuEstado(this, 'desparasitacion', '${d.id}')">🗓️</button>
+                            </div>
                             <button class="btn btn-secondary btn-icon-only" onclick="abrirEditarControlExterno('${d.id}')" title="Editar">✏️</button>
                             <button class="btn btn-danger btn-icon-only" onclick="confirmarEliminarDesparasitacion('${d.id}')" title="Eliminar">🗑️</button>
                         </td>
@@ -922,11 +1016,22 @@ function renderizarHistorialesCartilla(mascota) {
     } else {
         const ordenados = [...controles].sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
         cTimeline.innerHTML = ordenados.map(c => {
-            return `
+                let statusBadge = '';
+                if (c.proximoControl) {
+                    if (c.status === 'asistio') statusBadge = '<span class="status-badge success">Asistió</span>';
+                    else if (c.status === 'no_asistio') statusBadge = '<span class="status-badge danger">No Asistió</span>';
+                    else if (c.status === 'reagendado') statusBadge = '<span class="status-badge warning">Reagendado</span>';
+                    else statusBadge = '<span class="status-badge" style="background:var(--text-muted);">Pendiente</span>';
+                }
+
+                return `
                 <div class="timeline-item">
                     <div class="timeline-item-header">
                         <span class="timeline-date">${formatearFechaLocal(c.fecha)}</span>
                         <span class="timeline-reason" style="flex: 1; margin-left: 12px;">${c.motivo}</span>
+                        <div class="dropdown no-print no-public" style="display:inline-block; margin-right:4px;">
+                            ${c.proximoControl ? `<button class="btn btn-secondary btn-icon-only" title="Cambiar Estado" onclick="abrirMenuEstado(this, 'control', '${c.id}')" style="padding: 4px 8px; font-size: 11px;">🗓️</button>` : ''}
+                        </div>
                         <button class="btn btn-secondary btn-icon-only no-print no-public" onclick="abrirEditarControl('${c.id}')" title="Editar" style="padding: 4px 8px; font-size: 11px;">✏️</button>
                         <button class="btn btn-danger btn-icon-only no-print no-public" onclick="confirmarEliminarControl('${c.id}')" title="Eliminar" style="padding: 4px 8px; font-size: 11px; margin-left: 4px;">🗑️</button>
                     </div>
@@ -941,7 +1046,7 @@ function renderizarHistorialesCartilla(mascota) {
                         ${c.diagnostico ? `<div class="timeline-detail-row"><span class="timeline-lbl">Diagnóstico:</span><span class="timeline-val">${c.diagnostico}</span></div>` : ''}
                         ${c.tratamiento ? `<div class="timeline-detail-row"><span class="timeline-lbl">Tratamiento:</span><span class="timeline-val">${c.tratamiento}</span></div>` : ''}
                         ${c.recomendaciones ? `<div class="timeline-detail-row"><span class="timeline-lbl">Indicaciones:</span><span class="timeline-val">${c.recomendaciones}</span></div>` : ''}
-                        ${c.proximoControl ? `<div class="timeline-detail-row"><span class="timeline-lbl" style="color:var(--primary);">Próximo Control:</span><span class="timeline-val" style="font-weight:700;">${formatearFechaLocal(c.proximoControl)}</span></div>` : ''}
+                        ${c.proximoControl ? `<div class="timeline-detail-row"><span class="timeline-lbl" style="color:var(--primary);">Próximo Control:</span><span class="timeline-val" style="font-weight:700;">${formatearFechaLocal(c.proximoControl)} &nbsp; ${statusBadge}</span></div>` : ''}
                     </div>
                 </div>
             `;
@@ -1085,34 +1190,6 @@ async function compartirWhatsApp() {
                 `*Ficha Clínica:* ${mascota.codigo}\n\n` +
                 `Historial preventivo de vacunas, desparasitaciones y controles en: ${cartillaUrl}`;
                 
-    // Descargar el QR automáticamente
-    try {
-        const qrContainer = document.getElementById('qrcode');
-        if (qrContainer) {
-            let qrUrl = null;
-            const canvas = qrContainer.querySelector('canvas');
-            if (canvas) {
-                qrUrl = canvas.toDataURL('image/png');
-            } else {
-                const img = qrContainer.querySelector('img');
-                if (img && img.src) {
-                    qrUrl = img.src;
-                }
-            }
-            if (qrUrl) {
-                const a = document.createElement('a');
-                a.href = qrUrl;
-                a.download = `QR_Cartilla_${mascota.nombre}.png`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                mostrarToast('Descargando QR para adjuntar en WhatsApp...', 'info');
-            }
-        }
-    } catch (e) {
-        console.error('No se pudo descargar el QR automáticamente', e);
-    }
-                
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(txt)}`, '_blank');
 }
 
@@ -1148,8 +1225,10 @@ function formatearFechaLocal(fechaStr) {
 function obtenerFotoMascota(mascota) {
     if (mascota.foto) return mascota.foto;
     const especie = (mascota.especie || '').toLowerCase();
-    const emoji = especie === 'perro' ? '🐶' : (especie === 'gato' ? '🐱' : '🐾');
-    const colorBg = especie === 'perro' ? '#E8EAF6' : (especie === 'gato' ? '#FCE4EC' : '#E0E0E0');
+    const isDog = especie === 'perro' || especie === 'canino';
+    const isCat = especie === 'gato' || especie === 'felino';
+    const emoji = isDog ? '🐶' : (isCat ? '🐱' : '🐾');
+    const colorBg = isDog ? '#E8EAF6' : (isCat ? '#FCE4EC' : '#E0E0E0');
     const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="${colorBg}"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="50">${emoji}</text></svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svgStr)}`;
 }
@@ -1428,7 +1507,7 @@ async function verCartillaMascotaPublica(id) {
         // Mascota
         document.getElementById('cartilla-pet-photo').src = obtenerFotoMascota(mascota);
         document.getElementById('cartilla-pet-name').textContent = mascota.nombre;
-        document.getElementById('cartilla-pet-especie').textContent = mascota.especie;
+        document.getElementById('cartilla-pet-especie').textContent = mapearEspecie(mascota.especie);
         document.getElementById('cartilla-pet-raza').textContent = mascota.raza || 'Mestizo';
         document.getElementById('cartilla-pet-sexo').textContent = mascota.sexo;
         document.getElementById('cartilla-pet-edad').textContent = calcularEdadMascota(mascota.fechaNacimiento);
@@ -1559,8 +1638,22 @@ async function iniciarCamara() {
         video.srcObject = streamCamara;
     } catch (err) {
         console.error('Error al acceder a la cámara:', err);
-        mostrarToast('No se pudo acceder a la cámara. Asegúrate de dar permisos.', 'error');
+        mostrarToast('Acceso denegado o no disponible. Abriendo cámara nativa...', 'warning');
         cerrarModalCamara();
+        
+        // Fallback a input nativo con capture="environment"
+        let input;
+        if (camaraContexto === 'registro') {
+            input = document.getElementById('pet-photo-gallery');
+        } else {
+            input = document.getElementById('cartilla-pet-photo-input');
+        }
+        if (input) {
+            input.setAttribute('capture', 'environment');
+            input.click();
+            // Removemos capture después para que el botón de galería normal siga funcionando como galería
+            setTimeout(() => input.removeAttribute('capture'), 1000);
+        }
     }
 }
 
@@ -1574,9 +1667,23 @@ function capturarFotoCamara() {
     const canvas = document.getElementById('camara-canvas');
     if (!video || !streamCamara) return;
 
-    // Ajustar el canvas al tamaño original del video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Calcular dimensiones manteniendo la proporción, con un máximo de 800px para evitar memory heap en tablets
+    const maxDim = 800;
+    let vw = video.videoWidth;
+    let vh = video.videoHeight;
+    
+    if (vw > maxDim || vh > maxDim) {
+        if (vw > vh) {
+            vh = Math.floor((maxDim / vw) * vh);
+            vw = maxDim;
+        } else {
+            vw = Math.floor((maxDim / vh) * vw);
+            vh = maxDim;
+        }
+    }
+
+    canvas.width = vw;
+    canvas.height = vh;
     const ctx = canvas.getContext('2d');
     
     // Si estamos usando la cámara frontal, invertir la imagen horizontalmente
@@ -1587,10 +1694,23 @@ function capturarFotoCamara() {
     
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
+    // Mostrar feedback de carga
+    const btnCaptura = document.querySelector('#modal-camara .btn-primary');
+    const textoOriginal = btnCaptura ? btnCaptura.textContent : '';
+    if (btnCaptura) {
+        btnCaptura.textContent = 'Procesando...';
+        btnCaptura.disabled = true;
+    }
+
     // Convertir canvas a Blob/File
     canvas.toBlob(blob => {
+        if (btnCaptura) {
+            btnCaptura.textContent = textoOriginal;
+            btnCaptura.disabled = false;
+        }
+        
         if (!blob) {
-            mostrarToast('Error al capturar la foto.', 'error');
+            mostrarToast('Error al procesar la foto en este dispositivo.', 'error');
             return;
         }
         const file = new File([blob], 'captura_camara.jpg', { type: 'image/jpeg' });
@@ -1601,8 +1721,14 @@ function capturarFotoCamara() {
             manejarSubidaFoto(file);
         } else if (camaraContexto === 'cartilla') {
             if (UIState.mascotaActivaId) {
+                mostrarToast('Guardando foto en el paciente...', 'info');
                 procesarComprimirYSubirImagen(file, 400, 400, 'mascotas', async (urlOrBase64) => {
-                    const exito = await actualizarMascota(UIState.mascotaActivaId, { foto: urlOrBase64 });
+                    // aquí usamos editarMascota (en el frontend original decía actualizarMascota, pero el import es editarMascota)
+                    // verifiquemos si actualizarMascota existe, o cambiamos a editarMascota
+                    const exito = typeof actualizarMascota === 'function' ? 
+                                  await actualizarMascota(UIState.mascotaActivaId, { foto: urlOrBase64 }) :
+                                  await editarMascota(UIState.mascotaActivaId, { foto: urlOrBase64 });
+                                  
                     if (exito) {
                         mostrarToast('Foto del paciente actualizada correctamente.', 'success');
                         await verCartillaMascota(UIState.mascotaActivaId);
@@ -1613,4 +1739,63 @@ function capturarFotoCamara() {
             }
         }
     }, 'image/jpeg', 0.85);
+}
+
+// ==========================================
+// ESTADOS DE CITAS / EVENTOS CLINICOS
+// ==========================================
+
+function abrirMenuEstado(btnElement, tipoEvento, idEvento) {
+    document.getElementById('estado-tipo-evento').value = tipoEvento;
+    document.getElementById('estado-evento-id').value = idEvento;
+    document.getElementById('estado-select').value = 'pendiente';
+    document.getElementById('estado-fecha-asistencia').value = new Date().toISOString().split('T')[0];
+    toggleFechaAsistencia();
+    
+    abrirModal('estado');
+}
+
+function toggleFechaAsistencia() {
+    const estado = document.getElementById('estado-select').value;
+    const groupFecha = document.getElementById('group-fecha-asistencia');
+    if (estado === 'asistio') {
+        groupFecha.style.display = 'block';
+    } else {
+        groupFecha.style.display = 'none';
+    }
+}
+
+async function guardarCambioEstado() {
+    const tipo = document.getElementById('estado-tipo-evento').value;
+    const idEvento = document.getElementById('estado-evento-id').value;
+    const estado = document.getElementById('estado-select').value;
+    let fechaAsistencia = document.getElementById('estado-fecha-asistencia').value;
+    
+    if (estado !== 'asistio') {
+        fechaAsistencia = null;
+    }
+
+    if (!UIState.mascotaActivaId) return;
+
+    try {
+        let res;
+        if (tipo === 'vacuna') {
+            res = await window.API.actualizarStatusVacuna(UIState.mascotaActivaId, idEvento, estado, fechaAsistencia);
+        } else if (tipo === 'desparasitacion') {
+            res = await window.API.actualizarStatusDesparasitacion(UIState.mascotaActivaId, idEvento, estado, fechaAsistencia);
+        } else if (tipo === 'control') {
+            res = await window.API.actualizarStatusControl(UIState.mascotaActivaId, idEvento, estado, fechaAsistencia);
+        }
+
+        if (res && res.mensaje) {
+            mostrarToast('Estado actualizado correctamente', 'success');
+            cerrarModal('estado');
+            await verCartillaMascota(UIState.mascotaActivaId); // Recargar cartilla
+        } else {
+            mostrarToast('Error al actualizar el estado', 'error');
+        }
+    } catch (e) {
+        console.error("Error cambiando estado", e);
+        mostrarToast('Error al comunicar con el servidor', 'error');
+    }
 }

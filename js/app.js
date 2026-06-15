@@ -628,5 +628,22 @@ function cerrarSesionClinica() {
     mostrarToast('Sesión cerrada correctamente.', 'info');
     const logoutBtn = document.getElementById('nav-btn-logout');
     if (logoutBtn) logoutBtn.style.display = 'none';
-    verificarEnrutamiento();
 }
+
+/**
+ * Mostrar/Ocultar contraseña
+ */
+window.togglePassword = function(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.textContent = '🙈';
+            btn.setAttribute('aria-label', 'Ocultar contraseña');
+        } else {
+            input.type = 'password';
+            btn.textContent = '👁️';
+            btn.setAttribute('aria-label', 'Mostrar contraseña');
+        }
+    }
+};

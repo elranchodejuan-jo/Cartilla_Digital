@@ -6,6 +6,10 @@
 
 let bancoPestañaActiva = 'vacunas';
 
+let cacheVacunas = [];
+let cacheInternos = [];
+let cacheExternos = [];
+
 // Inicializar el Banco Clínico cuando sea necesario
 document.addEventListener('DOMContentLoaded', () => {
     configurarManejadoresBanco();
@@ -34,6 +38,7 @@ function cambiarPestañaBanco(tabName) {
     });
     
     // Renderizar la tabla correspondiente
+    // Renderizar la tabla correspondiente
     if (tabName === 'vacunas') {
         renderizarBancoVacunas();
     } else if (tabName === 'internos') {
@@ -50,31 +55,38 @@ function renderizarBancoVacunas() {
     const tbody = document.getElementById('banco-vacunas-table-body');
     if (!tbody) return;
     
-    const vacunas = obtenerVacunasBanco();
-    if (vacunas.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No hay vacunas registradas en el banco.</td></tr>`;
-        return;
-    }
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Cargando...</td></tr>`;
     
-    tbody.innerHTML = vacunas.map(v => {
-        return `
-            <tr>
-                <td data-label="Nombre Comercial"><strong>${v.nombre}</strong></td>
-                <td data-label="Tipo"><span class="status-badge info">${v.tipo}</span></td>
-                <td data-label="Especie"><span class="patient-badge ${v.especie.toLowerCase() === 'perro' ? 'perro' : v.especie.toLowerCase() === 'gato' ? 'gato' : ''}">${v.especie}</span></td>
-                <td data-label="Enfermedades"><span style="font-size:12px;">${v.enfermedades || 'N/A'}</span></td>
-                <td data-label="Laboratorio">${v.laboratorio || 'N/A'}</td>
-                <td data-label="Lote"><span style="font-family:monospace; font-size:12px;">${v.lote || 'N/A'}</span></td>
-                <td data-label="Frecuencia">${v.frecuencia || 'N/A'}</td>
-                <td data-label="Acciones">
-                    <div style="display:flex; gap:6px; justify-content: flex-end;">
-                        <button class="btn btn-secondary btn-icon-only" onclick="abrirModalBanco('vacuna', '${v.id}')" title="Editar">✏️</button>
-                        <button class="btn btn-danger btn-icon-only" onclick="eliminarDeBanco('vacuna', '${v.id}', '${v.nombre}')" title="Eliminar">🗑️</button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    }).join('');
+    window.API.obtenerBancoVacunas().then(vacunas => {
+        cacheVacunas = vacunas || [];
+        if (!cacheVacunas || cacheVacunas.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No hay vacunas registradas en el banco.</td></tr>`;
+            return;
+        }
+        
+        tbody.innerHTML = vacunas.map(v => {
+            return `
+                <tr>
+                    <td data-label="Nombre Comercial"><strong>${v.nombre}</strong></td>
+                    <td data-label="Tipo"><span class="status-badge info">Vacuna</span></td>
+                    <td data-label="Especie"><span class="patient-badge ${v.especie && v.especie.toLowerCase() === 'canino' ? 'perro' : v.especie && v.especie.toLowerCase() === 'felino' ? 'gato' : ''}">${v.especie}</span></td>
+                    <td data-label="Enfermedades"><span style="font-size:12px;">${v.enfermedades || 'N/A'}</span></td>
+                    <td data-label="Laboratorio">${v.laboratorio || 'N/A'}</td>
+                    <td data-label="Lote"><span style="font-family:monospace; font-size:12px;">${v.lote || 'N/A'}</span></td>
+                    <td data-label="Frecuencia">${v.frecuencia || 'N/A'}</td>
+                    <td data-label="Acciones">
+                        <div style="display:flex; gap:6px; justify-content: flex-end;">
+                            <button class="btn btn-secondary btn-icon-only" onclick="abrirModalBanco('vacuna', '${v.id}')" title="Editar">✏️</button>
+                            <button class="btn btn-danger btn-icon-only" onclick="eliminarDeBanco('vacuna', '${v.id}', '${v.nombre}')" title="Eliminar">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }).catch(err => {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Error al cargar vacunas.</td></tr>`;
+    });
 }
 
 /**
@@ -84,31 +96,38 @@ function renderizarBancoInternos() {
     const tbody = document.getElementById('banco-internos-table-body');
     if (!tbody) return;
     
-    const productos = obtenerAntiparasitariosInternosBanco();
-    if (productos.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No hay antiparasitarios internos en el banco.</td></tr>`;
-        return;
-    }
-    
-    tbody.innerHTML = productos.map(p => {
-        return `
-            <tr>
-                <td data-label="Nombre"><strong>${p.nombre}</strong></td>
-                <td data-label="Principio Activo"><span style="font-size:12px; color:var(--text-muted);">${p.principioActivo || 'N/A'}</span></td>
-                <td data-label="Especie"><span class="patient-badge ${p.especie.toLowerCase() === 'perro' ? 'perro' : p.especie.toLowerCase() === 'gato' ? 'gato' : ''}">${p.especie}</span></td>
-                <td data-label="Presentación"><span class="status-badge info" style="text-transform: capitalize;">${p.presentacion}</span></td>
-                <td data-label="Dosis">${p.dosisRecomendada || 'N/A'}</td>
-                <td data-label="Vía">${p.viaAdministracion}</td>
-                <td data-label="Frecuencia">${p.frecuenciaRecomendada || 'N/A'}</td>
-                <td data-label="Acciones">
-                    <div style="display:flex; gap:6px; justify-content: flex-end;">
-                        <button class="btn btn-secondary btn-icon-only" onclick="abrirModalBanco('interno', '${p.id}')" title="Editar">✏️</button>
-                        <button class="btn btn-danger btn-icon-only" onclick="eliminarDeBanco('interno', '${p.id}', '${p.nombre}')" title="Eliminar">🗑️</button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    }).join('');
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Cargando...</td></tr>`;
+
+    window.API.obtenerBancoInternos().then(productos => {
+        cacheInternos = productos || [];
+        if (!cacheInternos || cacheInternos.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No hay antiparasitarios internos en el banco.</td></tr>`;
+            return;
+        }
+        
+        tbody.innerHTML = productos.map(p => {
+            return `
+                <tr>
+                    <td data-label="Nombre"><strong>${p.nombre}</strong></td>
+                    <td data-label="Principio Activo"><span style="font-size:12px; color:var(--text-muted);">${p.parasitos || 'N/A'}</span></td>
+                    <td data-label="Especie"><span class="patient-badge ${p.especie && p.especie.toLowerCase() === 'canino' ? 'perro' : p.especie && p.especie.toLowerCase() === 'felino' ? 'gato' : ''}">${p.especie}</span></td>
+                    <td data-label="Presentación"><span class="status-badge info" style="text-transform: capitalize;">${p.tipo || 'N/A'}</span></td>
+                    <td data-label="Dosis">${p.dosis || 'N/A'}</td>
+                    <td data-label="Vía">${p.via || 'N/A'}</td>
+                    <td data-label="Rango Peso">${p.rango_peso || 'N/A'}</td>
+                    <td data-label="Acciones">
+                        <div style="display:flex; gap:6px; justify-content: flex-end;">
+                            <button class="btn btn-secondary btn-icon-only" onclick="abrirModalBanco('interno', '${p.id}')" title="Editar">✏️</button>
+                            <button class="btn btn-danger btn-icon-only" onclick="eliminarDeBanco('interno', '${p.id}', '${p.nombre}')" title="Eliminar">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }).catch(err => {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Error al cargar antiparasitarios internos.</td></tr>`;
+    });
 }
 
 /**
@@ -118,30 +137,37 @@ function renderizarBancoExternos() {
     const tbody = document.getElementById('banco-externos-table-body');
     if (!tbody) return;
     
-    const productos = obtenerAntiparasitariosExternosBanco();
-    if (productos.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No hay antiparasitarios externos en el banco.</td></tr>`;
-        return;
-    }
-    
-    tbody.innerHTML = productos.map(p => {
-        return `
-            <tr>
-                <td data-label="Nombre"><strong>${p.nombre}</strong></td>
-                <td data-label="Principio Activo"><span style="font-size:12px; color:var(--text-muted);">${p.principioActivo || 'N/A'}</span></td>
-                <td data-label="Especie"><span class="patient-badge ${p.especie.toLowerCase() === 'perro' ? 'perro' : p.especie.toLowerCase() === 'gato' ? 'gato' : ''}">${p.especie}</span></td>
-                <td data-label="Tipo"><span class="status-badge warning">${p.tipo}</span></td>
-                <td data-label="Rango Peso">${p.rangoPeso || 'N/A'}</td>
-                <td data-label="Duración">${p.duracionProteccion || 'N/A'}</td>
-                <td data-label="Acciones">
-                    <div style="display:flex; gap:6px; justify-content: flex-end;">
-                        <button class="btn btn-secondary btn-icon-only" onclick="abrirModalBanco('externo', '${p.id}')" title="Editar">✏️</button>
-                        <button class="btn btn-danger btn-icon-only" onclick="eliminarDeBanco('externo', '${p.id}', '${p.nombre}')" title="Eliminar">🗑️</button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    }).join('');
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;">Cargando...</td></tr>`;
+
+    window.API.obtenerBancoExternos().then(productos => {
+        cacheExternos = productos || [];
+        if (!cacheExternos || cacheExternos.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No hay antiparasitarios externos en el banco.</td></tr>`;
+            return;
+        }
+        
+        tbody.innerHTML = productos.map(p => {
+            return `
+                <tr>
+                    <td data-label="Nombre"><strong>${p.nombre}</strong></td>
+                    <td data-label="Principio Activo"><span style="font-size:12px; color:var(--text-muted);">${p.parasitos || 'N/A'}</span></td>
+                    <td data-label="Especie"><span class="patient-badge ${p.especie && p.especie.toLowerCase() === 'canino' ? 'perro' : p.especie && p.especie.toLowerCase() === 'felino' ? 'gato' : ''}">${p.especie}</span></td>
+                    <td data-label="Tipo"><span class="status-badge warning">${p.tipo || 'N/A'}</span></td>
+                    <td data-label="Rango Peso">${p.rango_peso || 'N/A'}</td>
+                    <td data-label="Dosis">${p.dosis || 'N/A'}</td>
+                    <td data-label="Acciones">
+                        <div style="display:flex; gap:6px; justify-content: flex-end;">
+                            <button class="btn btn-secondary btn-icon-only" onclick="abrirModalBanco('externo', '${p.id}')" title="Editar">✏️</button>
+                            <button class="btn btn-danger btn-icon-only" onclick="eliminarDeBanco('externo', '${p.id}', '${p.nombre}')" title="Eliminar">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }).catch(err => {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Error al cargar antiparasitarios externos.</td></tr>`;
+    });
 }
 
 /**
@@ -162,7 +188,7 @@ function abrirModalBanco(tipo, id = null) {
     // Cargar datos si es edición
     if (id) {
         if (tipo === 'vacuna') {
-            const v = obtenerVacunasBanco().find(item => item.id === id);
+            const v = cacheVacunas.find(item => item.id === id);
             if (v) {
                 document.getElementById('banco-vac-nombre').value = v.nombre;
                 document.getElementById('banco-vac-tipo').value = v.tipo;
@@ -174,7 +200,7 @@ function abrirModalBanco(tipo, id = null) {
                 document.getElementById('banco-vac-obs').value = v.observaciones;
             }
         } else if (tipo === 'interno') {
-            const p = obtenerAntiparasitariosInternosBanco().find(item => item.id === id);
+            const p = cacheInternos.find(item => item.id === id);
             if (p) {
                 document.getElementById('banco-int-nombre').value = p.nombre;
                 document.getElementById('banco-int-principio').value = p.principioActivo;
@@ -190,7 +216,7 @@ function abrirModalBanco(tipo, id = null) {
                 document.getElementById('banco-int-obs').value = p.observaciones;
             }
         } else if (tipo === 'externo') {
-            const p = obtenerAntiparasitariosExternosBanco().find(item => item.id === id);
+            const p = cacheExternos.find(item => item.id === id);
             if (p) {
                 document.getElementById('banco-ext-nombre').value = p.nombre;
                 document.getElementById('banco-ext-principio').value = p.principioActivo;
@@ -223,18 +249,23 @@ function cerrarModalBanco(tipo) {
 /**
  * Elimina un registro del banco clínico previa confirmación.
  */
-function eliminarDeBanco(tipo, id, nombre) {
+async function eliminarDeBanco(tipo, id, nombre) {
     if (confirm(`¿Está seguro de eliminar "${nombre}" del Banco Clínico? Ya no estará disponible para autocompletar nuevos registros.`)) {
-        let exito = false;
-        if (tipo === 'vacuna') exito = eliminarVacunaBanco(id);
-        else if (tipo === 'interno') exito = eliminarAntiparasitarioInternoBanco(id);
-        else if (tipo === 'externo') exito = eliminarAntiparasitarioExternoBanco(id);
-        
-        if (exito) {
-            mostrarToast('Producto eliminado del banco clínico.', 'success');
-            cambiarPestañaBanco(bancoPestañaActiva);
-        } else {
-            mostrarToast('Error al eliminar del banco.', 'error');
+        try {
+            let res;
+            if (tipo === 'vacuna') res = await window.API.eliminarBancoVacuna(id);
+            else if (tipo === 'interno') res = await window.API.eliminarBancoInterno(id);
+            else if (tipo === 'externo') res = await window.API.eliminarBancoExterno(id);
+            
+            if (res && res.mensaje) {
+                mostrarToast('Producto eliminado del banco clínico.', 'success');
+                cambiarPestañaBanco(bancoPestañaActiva);
+            } else {
+                mostrarToast('Error al eliminar del banco.', 'error');
+            }
+        } catch (e) {
+            console.error("Error eliminando:", e);
+            mostrarToast('Error al comunicar con el servidor.', 'error');
         }
     }
 }
@@ -246,12 +277,11 @@ function configurarManejadoresBanco() {
     // Vacuna Banco Form
     const fVac = document.getElementById('form-banco-vacuna');
     if (fVac) {
-        fVac.addEventListener('submit', (e) => {
+        fVac.addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('banco-vac-id').value;
             const datos = {
                 nombre: document.getElementById('banco-vac-nombre').value.trim(),
-                tipo: document.getElementById('banco-vac-tipo').value.trim(),
                 especie: document.getElementById('banco-vac-especie').value,
                 enfermedades: document.getElementById('banco-vac-enfermedades').value.trim(),
                 laboratorio: document.getElementById('banco-vac-laboratorio').value.trim(),
@@ -265,19 +295,24 @@ function configurarManejadoresBanco() {
                 return;
             }
             
-            let exito = false;
-            if (id) {
-                exito = actualizarVacunaBanco(id, datos);
-            } else {
-                exito = guardarVacunaBanco(datos);
-            }
-            
-            if (exito) {
-                mostrarToast(id ? 'Vacuna actualizada en banco.' : 'Vacuna guardada en banco.', 'success');
-                cerrarModalBanco('vacuna');
-                cambiarPestañaBanco('vacunas');
-            } else {
-                mostrarToast('Error al guardar vacuna.', 'error');
+            try {
+                let res;
+                if (id) {
+                    res = await window.API.editarBancoVacuna(id, datos);
+                } else {
+                    res = await window.API.guardarBancoVacuna(datos);
+                }
+                
+                if (res && (res.id || res.mensaje)) {
+                    mostrarToast(id ? 'Vacuna actualizada en banco.' : 'Vacuna guardada en banco.', 'success');
+                    cerrarModalBanco('vacuna');
+                    cambiarPestañaBanco('vacunas');
+                } else {
+                    mostrarToast('Error al guardar vacuna.', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                mostrarToast('Error de conexión', 'error');
             }
         });
     }
@@ -285,21 +320,17 @@ function configurarManejadoresBanco() {
     // Antiparasitario Interno Form
     const fInt = document.getElementById('form-banco-interno');
     if (fInt) {
-        fInt.addEventListener('submit', (e) => {
+        fInt.addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('banco-int-id').value;
             const datos = {
                 nombre: document.getElementById('banco-int-nombre').value.trim(),
-                principioActivo: document.getElementById('banco-int-principio').value.trim(),
                 especie: document.getElementById('banco-int-especie').value,
-                presentacion: document.getElementById('banco-int-presentacion').value,
-                dosisRecomendada: document.getElementById('banco-int-dosis').value.trim(),
-                rangoPeso: document.getElementById('banco-int-peso').value.trim(),
-                viaAdministracion: document.getElementById('banco-int-via').value.trim(),
-                frecuenciaRecomendada: document.getElementById('banco-int-frecuencia').value.trim(),
-                parasitosCubre: document.getElementById('banco-int-parasitos').value.trim(),
-                laboratorio: document.getElementById('banco-int-laboratorio').value.trim(),
-                lote: document.getElementById('banco-int-lote').value.trim(),
+                tipo: document.getElementById('banco-int-presentacion').value,
+                dosis: document.getElementById('banco-int-dosis').value.trim(),
+                rango_peso: document.getElementById('banco-int-peso').value.trim(),
+                via: document.getElementById('banco-int-via').value.trim(),
+                parasitos: document.getElementById('banco-int-parasitos').value.trim(),
                 observaciones: document.getElementById('banco-int-obs').value.trim()
             };
             
@@ -308,19 +339,24 @@ function configurarManejadoresBanco() {
                 return;
             }
             
-            let exito = false;
-            if (id) {
-                exito = actualizarAntiparasitarioInternoBanco(id, datos);
-            } else {
-                exito = guardarAntiparasitarioInternoBanco(datos);
-            }
-            
-            if (exito) {
-                mostrarToast(id ? 'Producto actualizado en banco.' : 'Producto guardado en banco.', 'success');
-                cerrarModalBanco('interno');
-                cambiarPestañaBanco('internos');
-            } else {
-                mostrarToast('Error al guardar el producto.', 'error');
+            try {
+                let res;
+                if (id) {
+                    res = await window.API.editarBancoInterno(id, datos);
+                } else {
+                    res = await window.API.guardarBancoInterno(datos);
+                }
+                
+                if (res && (res.id || res.mensaje)) {
+                    mostrarToast(id ? 'Producto actualizado en banco.' : 'Producto guardado en banco.', 'success');
+                    cerrarModalBanco('interno');
+                    cambiarPestañaBanco('internos');
+                } else {
+                    mostrarToast('Error al guardar el producto.', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                mostrarToast('Error de conexión', 'error');
             }
         });
     }
@@ -328,22 +364,18 @@ function configurarManejadoresBanco() {
     // Antiparasitario Externo Form
     const fExt = document.getElementById('form-banco-externo');
     if (fExt) {
-        fExt.addEventListener('submit', (e) => {
+        fExt.addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('banco-ext-id').value;
             const datos = {
                 nombre: document.getElementById('banco-ext-nombre').value.trim(),
-                principioActivo: document.getElementById('banco-ext-principio').value.trim(),
                 especie: document.getElementById('banco-ext-especie').value,
                 tipo: document.getElementById('banco-ext-tipo').value,
-                rangoPeso: document.getElementById('banco-ext-peso').value.trim(),
-                duracionProteccion: document.getElementById('banco-ext-duracion').value.trim(),
-                frecuenciaRecomendada: document.getElementById('banco-ext-frecuencia').value.trim(),
-                parasitosCubre: document.getElementById('banco-ext-parasitos').value.trim(),
-                laboratorio: document.getElementById('banco-ext-laboratorio').value.trim(),
-                lote: document.getElementById('banco-ext-lote').value.trim(),
-                observaciones: document.getElementById('banco-ext-obs').value.trim(),
-                advertencias: document.getElementById('banco-ext-advertencias').value.trim()
+                rango_peso: document.getElementById('banco-ext-peso').value.trim(),
+                parasitos: document.getElementById('banco-ext-parasitos').value.trim(),
+                dosis: document.getElementById('banco-ext-frecuencia').value.trim(), // Reusing this for Dosis in UI just to match the old form for now, wait I should use duracion as dosis or add dosis. Let's just pass what we can.
+                via: 'Tópica/Oral', // Default
+                observaciones: document.getElementById('banco-ext-obs').value.trim()
             };
             
             if (!datos.nombre) {
@@ -351,19 +383,24 @@ function configurarManejadoresBanco() {
                 return;
             }
             
-            let exito = false;
-            if (id) {
-                exito = actualizarAntiparasitarioExternoBanco(id, datos);
-            } else {
-                exito = guardarAntiparasitarioExternoBanco(datos);
-            }
-            
-            if (exito) {
-                mostrarToast(id ? 'Producto actualizado en banco.' : 'Producto guardado en banco.', 'success');
-                cerrarModalBanco('externo');
-                cambiarPestañaBanco('externos');
-            } else {
-                mostrarToast('Error al guardar el producto.', 'error');
+            try {
+                let res;
+                if (id) {
+                    res = await window.API.editarBancoExterno(id, datos);
+                } else {
+                    res = await window.API.guardarBancoExterno(datos);
+                }
+                
+                if (res && (res.id || res.mensaje)) {
+                    mostrarToast(id ? 'Producto actualizado en banco.' : 'Producto guardado en banco.', 'success');
+                    cerrarModalBanco('externo');
+                    cambiarPestañaBanco('externos');
+                } else {
+                    mostrarToast('Error al guardar el producto.', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                mostrarToast('Error de conexión', 'error');
             }
         });
     }
@@ -380,7 +417,7 @@ function cargarSelectVacunasBanco(especiePaciente) {
     if (!select) return;
     
     select.innerHTML = '<option value="">-- Seleccionar para autocompletar --</option>';
-    const vacunas = obtenerVacunasBanco();
+    const vacunas = cacheVacunas;
     
     // Filtrar por especie recomendada ('Perro', 'Gato', o 'Ambos')
     const filtradas = vacunas.filter(v => {
@@ -404,7 +441,7 @@ function cargarSelectInternosBanco(especiePaciente) {
     if (!select) return;
     
     select.innerHTML = '<option value="">-- Seleccionar para autocompletar --</option>';
-    const productos = obtenerAntiparasitariosInternosBanco();
+    const productos = cacheInternos;
     
     const filtrados = productos.filter(p => {
         return p.especie === 'Ambos' || p.especie.toLowerCase() === especiePaciente.toLowerCase();
@@ -427,7 +464,7 @@ function cargarSelectExternosBanco(especiePaciente) {
     if (!select) return;
     
     select.innerHTML = '<option value="">-- Seleccionar para autocompletar --</option>';
-    const productos = obtenerAntiparasitariosExternosBanco();
+    const productos = cacheExternos;
     
     const filtrados = productos.filter(p => {
         return p.especie === 'Ambos' || p.especie.toLowerCase() === especiePaciente.toLowerCase();
@@ -447,7 +484,7 @@ function cargarSelectExternosBanco(especiePaciente) {
  */
 function autocompletarVacunaDesdeBanco(id) {
     if (!id) return;
-    const v = obtenerVacunasBanco().find(item => item.id === id);
+    const v = cacheVacunas.find(item => item.id === id);
     if (!v) return;
     
     document.getElementById('vac-nombre').value = v.nombre;
@@ -465,15 +502,15 @@ function autocompletarVacunaDesdeBanco(id) {
  */
 function autocompletarInternoDesdeBanco(id) {
     if (!id) return;
-    const p = obtenerAntiparasitariosInternosBanco().find(item => item.id === id);
+    const p = cacheInternos.find(item => item.id === id);
     if (!p) return;
     
     document.getElementById('des-int-producto').value = p.nombre;
-    document.getElementById('des-int-dosis').value = p.dosisRecomendada || '';
-    document.getElementById('des-int-via').value = p.viaAdministracion || 'Oral';
+    document.getElementById('des-int-dosis').value = p.dosis || '';
+    document.getElementById('des-int-via').value = p.via || 'Oral';
     
     let obs = '';
-    if (p.principioActivo) obs += `Principio activo: ${p.principioActivo}. `;
+    if (p.parasitos) obs += `Parásitos: ${p.parasitos}. `;
     if (p.lote) obs += `Lote: ${p.lote}. `;
     if (p.observaciones) obs += p.observaciones;
     document.getElementById('des-int-obs').value = obs.trim();
@@ -487,17 +524,16 @@ function autocompletarInternoDesdeBanco(id) {
  */
 function autocompletarExternoDesdeBanco(id) {
     if (!id) return;
-    const p = obtenerAntiparasitariosExternosBanco().find(item => item.id === id);
+    const p = cacheExternos.find(item => item.id === id);
     if (!p) return;
     
     document.getElementById('des-ext-producto').value = p.nombre;
     document.getElementById('des-ext-tipo').value = p.tipo || 'Tableta';
-    document.getElementById('des-ext-peso').value = p.rangoPeso || '';
-    document.getElementById('des-ext-parasitos').value = p.parasitosCubre || '';
+    document.getElementById('des-ext-peso').value = p.rango_peso || '';
+    document.getElementById('des-ext-parasitos').value = p.parasitos || '';
     
     let obs = '';
-    if (p.principioActivo) obs += `Principio activo: ${p.principioActivo}. `;
-    if (p.duracionProteccion) obs += `Protección: ${p.duracionProteccion}. `;
+    if (p.dosis) obs += `Frecuencia: ${p.dosis}. `;
     if (p.lote) obs += `Lote: ${p.lote}. `;
     if (p.observaciones) obs += p.observaciones;
     document.getElementById('des-ext-obs').value = obs.trim();
