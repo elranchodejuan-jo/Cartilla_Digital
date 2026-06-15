@@ -16,6 +16,8 @@ const pool = new Pool({
 const migrarBaseDatos = async () => {
     try {
         await pool.query(`
+            CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+            
             ALTER TABLE mascotas 
             ADD COLUMN IF NOT EXISTS tutor_nombre VARCHAR(150) NOT NULL DEFAULT 'Sin Tutor',
             ADD COLUMN IF NOT EXISTS tutor_telefono VARCHAR(50),

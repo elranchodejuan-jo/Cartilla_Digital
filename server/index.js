@@ -428,8 +428,8 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
         // 2. Generar el código único de cartilla
         let especieCodigo = "O";
         const espLower = especie.toLowerCase().trim();
-        if (espLower === "perro" || espLower === "canino") especieCodigo = "P";
-        else if (espLower === "gato" || espLower === "felino") especieCodigo = "G";
+        if (espLower === "perro" || espLower === "canino") especieCodigo = "C";
+        else if (espLower === "gato" || espLower === "felino") especieCodigo = "F";
         
         const fechaCodigo = formatearFechaAAMMDD(hoy);
         const contadorStr = correlativo < 100 ? String(correlativo).padStart(2, "0") : String(correlativo);

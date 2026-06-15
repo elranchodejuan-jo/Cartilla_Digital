@@ -71,6 +71,7 @@ const DOM = {
         'control-externo': document.getElementById('modal-control-externo'),
         control: document.getElementById('modal-control'),
         observaciones: document.getElementById('modal-observaciones'),
+        estado: document.getElementById('modal-estado'),
         'transferencia-recibir': document.getElementById('modal-transferencia-recibir'),
         'transferencia-iniciar': document.getElementById('modal-transferencia-iniciar')
     },
@@ -270,14 +271,20 @@ function configurarSubidaArchivos() {
         if (!UIState.mascotaActivaId) return;
         if(confirm('¿Deseas eliminar la foto de este paciente? Esto se guardará inmediatamente.')) {
             mostrarToast('Eliminando foto...', 'info');
-            const exito = await editarMascota(UIState.mascotaActivaId, { foto: null });
-            if (exito) {
-                mostrarToast('Foto eliminada correctamente.', 'success');
-                const btnEliminarCartilla = document.getElementById('btn-eliminar-foto-cartilla');
-                if (btnEliminarCartilla) btnEliminarCartilla.style.display = 'none';
-                await cargarPerfilMascota(UIState.mascotaActivaId); // Recargar perfil
-            } else {
-                mostrarToast('Error al eliminar la foto.', 'error');
+            try {
+                // Usamos la API directamente para evitar las validaciones del formulario
+                const res = await window.API.editarMascota(UIState.mascotaActivaId, { foto: null });
+                if (res && res.mensaje) {
+                    mostrarToast('Foto eliminada correctamente.', 'success');
+                    const btnEliminarCartilla = document.getElementById('btn-eliminar-foto-cartilla');
+                    if (btnEliminarCartilla) btnEliminarCartilla.style.display = 'none';
+                    await cargarPerfilMascota(UIState.mascotaActivaId); // Recargar perfil
+                } else {
+                    mostrarToast('Error al eliminar la foto.', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                mostrarToast('Error de conexión al eliminar foto.', 'error');
             }
         }
     };
