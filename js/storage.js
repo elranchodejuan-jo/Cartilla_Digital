@@ -60,12 +60,14 @@ function sanearEsquemaVacuna(v) {
         nombre: v.nombre || 'Vacuna',
         enfermedades: v.enfermedades || '',
         laboratorio: v.laboratorio || '',
-        fechaAplicacion: v.fechaAplicacion || '',
-        proximaDosis: v.proximaDosis || '',
+        fechaAplicacion: v.fechaAplicacion || v.fecha_aplicacion || '',
+        proximaDosis: v.proximaDosis || v.proxima_dosis || '',
         lote: v.lote || '',
         responsable: v.responsable || 'Clínica Veterinaria',
-        responsableId: v.responsable_id || null,
-        observaciones: v.observaciones || ''
+        responsableId: v.responsableId || v.responsable_id || null,
+        observaciones: v.observaciones || '',
+        status: v.status || 'pendiente',
+        fechaAsistencia: v.fechaAsistencia || v.fecha_asistencia || null
     };
 }
 
@@ -74,16 +76,18 @@ function sanearEsquemaDesparasitacion(d) {
         id: d.id || generarUUID(),
         tipo: d.tipo || 'interna',
         producto: d.producto || d.nombre || 'Desparasitante',
-        tipoProducto: d.tipoProducto || 'tableta',
-        rangoPeso: d.rangoPeso || '',
-        parasitosCubre: d.parasitosCubre || '',
-        fechaAplicacion: d.fechaAplicacion || '',
-        proximaAplicacion: d.proximaAplicacion || '',
+        tipoProducto: d.tipoProducto || d.tipo_producto || 'tableta',
+        rangoPeso: d.rangoPeso || d.rango_peso || '',
+        parasitosCubre: d.parasitosCubre || d.parasitos_cubre || '',
+        fechaAplicacion: d.fechaAplicacion || d.fecha_aplicacion || '',
+        proximaAplicacion: d.proximaAplicacion || d.proxima_aplicacion || '',
         dosis: d.dosis || '',
         via: d.via || 'Oral',
         responsable: d.responsable || 'Clínica Veterinaria',
-        responsableId: d.responsable_id || null,
-        observaciones: d.observaciones || ''
+        responsableId: d.responsableId || d.responsable_id || null,
+        observaciones: d.observaciones || '',
+        status: d.status || 'pendiente',
+        fechaAsistencia: d.fechaAsistencia || d.fecha_asistencia || null
     };
 }
 
@@ -100,9 +104,11 @@ function sanearEsquemaControl(c) {
         diagnostico: c.diagnostico || '',
         tratamiento: c.tratamiento || '',
         recomendaciones: c.recomendaciones || '',
-        proximoControl: c.proximoControl || '',
+        proximoControl: c.proximoControl || c.proximo_control || '',
         responsable: c.responsable || 'Clínica Veterinaria',
-        responsableId: c.responsable_id || null
+        responsableId: c.responsableId || c.responsable_id || null,
+        status: c.status || 'pendiente',
+        fechaAsistencia: c.fechaAsistencia || c.fecha_asistencia || null
     };
 }
 
@@ -370,14 +376,14 @@ function sanearEsquemaAntiparasitarioInternoBanco(p) {
     return {
         id: p.id || generarUUID(),
         nombre: p.nombre || '',
-        principioActivo: p.principioActivo || '',
+        principioActivo: p.principioActivo || p.principio_activo || '',
         especie: p.especie || 'Ambos', // Perro, Gato, Ambos
-        presentacion: p.presentacion || 'tableta', // tableta, suspensión, pipeta, inyectable, pasta, otra
-        dosisRecomendada: p.dosisRecomendada || '',
-        rangoPeso: p.rangoPeso || '',
-        viaAdministracion: p.viaAdministracion || 'Oral',
-        frecuenciaRecomendada: p.frecuenciaRecomendada || '',
-        parasitosCubre: p.parasitosCubre || '',
+        presentacion: p.presentacion || p.tipo || 'tableta', // tableta, suspensión, pipeta, inyectable, pasta, otra
+        dosisRecomendada: p.dosisRecomendada || p.dosis || '',
+        rangoPeso: p.rangoPeso || p.rango_peso || '',
+        viaAdministracion: p.viaAdministracion || p.via || 'Oral',
+        frecuenciaRecomendada: p.frecuenciaRecomendada || p.frecuencia || '',
+        parasitosCubre: p.parasitosCubre || p.parasitos || '',
         laboratorio: p.laboratorio || '',
         lote: p.lote || '',
         observaciones: p.observaciones || ''
@@ -389,13 +395,13 @@ function sanearEsquemaAntiparasitarioExternoBanco(p) {
     return {
         id: p.id || generarUUID(),
         nombre: p.nombre || '',
-        principioActivo: p.principioActivo || '',
+        principioActivo: p.principioActivo || p.principio_activo || '',
         especie: p.especie || 'Ambos', // Perro, Gato, Ambos
         tipo: p.tipo || 'Tableta', // Tableta, Pipeta, Collar, Spray, Shampoo, Inyectable, Otro
-        rangoPeso: p.rangoPeso || '',
-        duracionProteccion: p.duracionProteccion || '',
-        frecuenciaRecomendada: p.frecuenciaRecomendada || '',
-        parasitosCubre: p.parasitosCubre || '',
+        rangoPeso: p.rangoPeso || p.rango_peso || '',
+        duracionProteccion: p.duracionProteccion || p.duracion || '',
+        frecuenciaRecomendada: p.frecuenciaRecomendada || p.frecuencia || p.dosis || '',
+        parasitosCubre: p.parasitosCubre || p.parasitos || '',
         laboratorio: p.laboratorio || '',
         lote: p.lote || '',
         observaciones: p.observaciones || '',

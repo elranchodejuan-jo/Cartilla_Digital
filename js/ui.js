@@ -15,6 +15,7 @@
 const UIState = {
     seccionActiva: 'inicio',
     mascotaActivaId: null,
+    mascotaActivaDetalle: null,
     mascotaEdicionId: null,
     filtroEspecie: 'todos',
     busquedaQuery: '',
@@ -249,6 +250,7 @@ function configurarSubidaArchivos() {
             });
         }
     }
+    window.manejarSubidaFotoMascota = manejarSubidaFoto;
     
     window.eliminarFotoMascotaFormulario = function() {
         if(confirm('¿Estás seguro de eliminar la foto seleccionada?')) {
@@ -278,7 +280,7 @@ function configurarSubidaArchivos() {
                     mostrarToast('Foto eliminada correctamente.', 'success');
                     const btnEliminarCartilla = document.getElementById('btn-eliminar-foto-cartilla');
                     if (btnEliminarCartilla) btnEliminarCartilla.style.display = 'none';
-                    await cargarPerfilMascota(UIState.mascotaActivaId); // Recargar perfil
+                    await verCartillaMascota(UIState.mascotaActivaId);
                 } else {
                     mostrarToast('Error al eliminar la foto.', 'error');
                 }
@@ -390,12 +392,19 @@ function mostrarToast(mensaje, tipo = 'success') {
     if (tipo === 'error') icono = '✗';
     if (tipo === 'info') icono = 'ℹ';
     
-    toast.innerHTML = `
-        <span><strong>${icono}</strong> ${mensaje}</span>
-        <button class="toast-close-btn" aria-label="Cerrar">&times;</button>
-    `;
-    
-    const closeBtn = toast.querySelector('.toast-close-btn');
+    const textWrap = document.createElement('span');
+    const strong = document.createElement('strong');
+    strong.textContent = icono;
+    textWrap.appendChild(strong);
+    textWrap.appendChild(document.createTextNode(` ${mensaje}`));
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close-btn';
+    closeBtn.setAttribute('aria-label', 'Cerrar');
+    closeBtn.innerHTML = '&times;';
+
+    toast.appendChild(textWrap);
+    toast.appendChild(closeBtn);
     closeBtn.addEventListener('click', () => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
@@ -423,7 +432,7 @@ async function abrirModal(modalId) {
         const submitBtn = modal.querySelector('form button[type="submit"]');
         const idInput = modal.querySelector('input[type="hidden"]');
         
-        if (idInput) idInput.value = '';
+        if (idInput && modalId !== 'estado') idInput.value = '';
         
         if (modalId === 'vacuna') {
             if (title) title.textContent = 'Registrar Vacuna';
@@ -449,22 +458,29 @@ async function abrirModal(modalId) {
         });
         
         if (UIState.mascotaActivaId) {
-            const mascotas = await obtenerMascotas();
-            const mascota = mascotas.find(m => m.id === UIState.mascotaActivaId);
-            if (mascota) {
-                const especie = mascota.especie;
-                if (modalId === 'vacuna') {
-                    cargarSelectVacunasBanco(especie);
-                    poblarSelectResponsables('vac-responsable');
-                } else if (modalId === 'desparasitacion-interna') {
-                    cargarSelectInternosBanco(especie);
-                    poblarSelectResponsables('des-int-responsable');
-                } else if (modalId === 'control-externo') {
-                    cargarSelectExternosBanco(especie);
-                    poblarSelectResponsables('des-ext-responsable');
-                } else if (modalId === 'control') {
-                    poblarSelectResponsables('ctrl-responsable');
+            try {
+                if (typeof cargarCacheBancoClinico === 'function') {
+                    await cargarCacheBancoClinico();
                 }
+                const mascotas = await obtenerMascotas();
+                const mascota = mascotas.find(m => m.id === UIState.mascotaActivaId);
+                if (mascota) {
+                    const especie = mascota.especie;
+                    if (modalId === 'vacuna') {
+                        cargarSelectVacunasBanco(especie);
+                        poblarSelectResponsables('vac-responsable');
+                    } else if (modalId === 'desparasitacion-interna') {
+                        cargarSelectInternosBanco(especie);
+                        poblarSelectResponsables('des-int-responsable');
+                    } else if (modalId === 'control-externo') {
+                        cargarSelectExternosBanco(especie);
+                        poblarSelectResponsables('des-ext-responsable');
+                    } else if (modalId === 'control') {
+                        poblarSelectResponsables('ctrl-responsable');
+                    }
+                }
+            } catch (err) {
+                console.error("Error cargando selects del banco clínico:", err);
             }
         }
     }
@@ -501,7 +517,7 @@ async function renderizarDashboard() {
     mascotas.forEach(mascota => {
         (mascota.vacunas || []).forEach(v => {
             if (v.proximaDosis) {
-                const ev = evaluarEstadoVacuna(v.proximaDosis);
+                const ev = obtenerEstadoPreventivoVisual(v.proximaDosis, v.status, evaluarEstadoVacuna);
                 if (ev.status === 'warning' || ev.status === 'danger') {
                     vacunasProximas++;
                     eventos.push({
@@ -520,7 +536,7 @@ async function renderizarDashboard() {
         
         (mascota.desparasitaciones || []).forEach(d => {
             if (d.proximaAplicacion) {
-                const ed = evaluarEstadoDesparasitacion(d.proximaAplicacion);
+                const ed = obtenerEstadoPreventivoVisual(d.proximaAplicacion, d.status, evaluarEstadoDesparasitacion);
                 if (ed.status === 'warning' || ed.status === 'danger') {
                     desparasitacionesProximas++;
                     eventos.push({
@@ -780,6 +796,7 @@ async function verCartillaMascota(id) {
     }
     
     UIState.mascotaActivaId = id;
+    UIState.mascotaActivaDetalle = mascota;
     const vet = obtenerVeterinaria() || { nombre: 'Cartilla Digital', iniciales: 'CD', telefono: '', direccion: '', logo: '' };
     
     // Encabezado
@@ -851,14 +868,9 @@ function renderizarHistorialesCartilla(mascota) {
     } else {
         const ordenadas = [...vacunas].sort((a,b) => new Date(b.fechaAplicacion) - new Date(a.fechaAplicacion));
         vBody.innerHTML = ordenadas.map(v => {
-            const ev = evaluarEstadoVacuna(v.proximaDosis);
-            const badgeClass = ev.status === 'success' ? 'success' : ev.status === 'warning' ? 'warning' : ev.status === 'danger' ? 'danger' : '';
-            
-            let statusBadge = '';
-            if (v.status === 'asistio') statusBadge = '<span class="status-badge success">Asistió</span>';
-            else if (v.status === 'no_asistio') statusBadge = '<span class="status-badge danger">No Asistió</span>';
-            else if (v.status === 'reagendado') statusBadge = '<span class="status-badge warning">Reagendado</span>';
-            else statusBadge = '<span class="status-badge" style="background:var(--text-muted);">Pendiente</span>';
+            const ev = obtenerEstadoPreventivoVisual(v.proximaDosis, v.status, evaluarEstadoVacuna);
+            const badgeClass = obtenerBadgeClase(ev.status);
+            const statusBadge = construirEstadoAsistenciaHtml(v.status, v.fechaAsistencia);
 
             return `
                 <tr>
@@ -923,14 +935,9 @@ function renderizarHistorialesCartilla(mascota) {
         } else {
             const ordenadas = [...desparasitacionesInternas].sort((a,b) => new Date(b.fechaAplicacion) - new Date(a.fechaAplicacion));
             dIntBody.innerHTML = ordenadas.map(d => {
-                const ed = evaluarEstadoDesparasitacion(d.proximaAplicacion);
-                const badgeClass = ed.status === 'success' ? 'success' : ed.status === 'warning' ? 'warning' : ed.status === 'danger' ? 'danger' : '';
-                
-                let statusBadge = '';
-                if (d.status === 'asistio') statusBadge = '<span class="status-badge success">Asistió</span>';
-                else if (d.status === 'no_asistio') statusBadge = '<span class="status-badge danger">No Asistió</span>';
-                else if (d.status === 'reagendado') statusBadge = '<span class="status-badge warning">Reagendado</span>';
-                else statusBadge = '<span class="status-badge" style="background:var(--text-muted);">Pendiente</span>';
+                const ed = obtenerEstadoPreventivoVisual(d.proximaAplicacion, d.status, evaluarEstadoDesparasitacion);
+                const badgeClass = obtenerBadgeClase(ed.status);
+                const statusBadge = construirEstadoAsistenciaHtml(d.status, d.fechaAsistencia);
 
                 return `
                     <tr>
@@ -965,14 +972,9 @@ function renderizarHistorialesCartilla(mascota) {
         } else {
             const ordenadas = [...desparasitacionesExternas].sort((a,b) => new Date(b.fechaAplicacion) - new Date(a.fechaAplicacion));
             dExtBody.innerHTML = ordenadas.map(d => {
-                const ed = evaluarEstadoDesparasitacion(d.proximaAplicacion);
-                const badgeClass = ed.status === 'success' ? 'success' : ed.status === 'warning' ? 'warning' : ed.status === 'danger' ? 'danger' : '';
-                
-                let statusBadge = '';
-                if (d.status === 'asistio') statusBadge = '<span class="status-badge success">Asistió</span>';
-                else if (d.status === 'no_asistio') statusBadge = '<span class="status-badge danger">No Asistió</span>';
-                else if (d.status === 'reagendado') statusBadge = '<span class="status-badge warning">Reagendado</span>';
-                else statusBadge = '<span class="status-badge" style="background:var(--text-muted);">Pendiente</span>';
+                const ed = obtenerEstadoPreventivoVisual(d.proximaAplicacion, d.status, evaluarEstadoDesparasitacion);
+                const badgeClass = obtenerBadgeClase(ed.status);
+                const statusBadge = construirEstadoAsistenciaHtml(d.status, d.fechaAsistencia);
 
                 return `
                     <tr>
@@ -1116,6 +1118,22 @@ function dibujarQROfflineCanvas(canvas, url, codigo) {
     }
 }
 
+function construirUrlCartillaPublica(mascotaId) {
+    const queryId = `?id=${encodeURIComponent(mascotaId)}`;
+    if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+        return `${window.location.origin}${window.location.pathname}${queryId}`;
+    }
+
+    const frontendUrlGuardada = localStorage.getItem('cartilla_digital_frontend_url');
+    const baseUrlLimpia = (frontendUrlGuardada || 'https://elranchodejuan-jo.github.io/Cartilla_Digital/')
+        .split('?')[0]
+        .replace(/#.*$/, '');
+    const baseUrl = baseUrlLimpia.endsWith('/') || baseUrlLimpia.endsWith('.html')
+        ? baseUrlLimpia
+        : `${baseUrlLimpia}/`;
+    return `${baseUrl}${queryId}`;
+}
+
 /**
  * Genera el QR Code
  */
@@ -1126,8 +1144,7 @@ function generarQRCartilla(mascota) {
     qrContainer.innerHTML = '';
     if (printQrContainer) printQrContainer.innerHTML = '';
     
-    const queryId = `?id=${mascota.id}`;
-    const cartillaUrl = window.location.origin + window.location.pathname + queryId;
+    const cartillaUrl = construirUrlCartillaPublica(mascota.id);
     
     if (typeof QRCode !== 'undefined') {
         try {
@@ -1177,11 +1194,28 @@ function generarQRCartilla(mascota) {
  */
 function copiarEnlaceCartilla() {
     if (!UIState.mascotaActivaId) return;
-    const cartillaUrl = `${window.location.origin}${window.location.pathname}?id=${UIState.mascotaActivaId}`;
+    const cartillaUrl = construirUrlCartillaPublica(UIState.mascotaActivaId);
     
-    navigator.clipboard.writeText(cartillaUrl)
-        .then(() => mostrarToast('Enlace de la cartilla digital copiado.', 'success'))
-        .catch(() => mostrarToast('Error al copiar el enlace.', 'error'));
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(cartillaUrl)
+            .then(() => mostrarToast('Enlace de la cartilla digital copiado.', 'success'))
+            .catch(() => copiarEnlaceCartillaFallback(cartillaUrl));
+    } else {
+        copiarEnlaceCartillaFallback(cartillaUrl);
+    }
+}
+
+function copiarEnlaceCartillaFallback(cartillaUrl) {
+    const textarea = document.createElement('textarea');
+    textarea.value = cartillaUrl;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copiado = document.execCommand('copy');
+    textarea.remove();
+    mostrarToast(copiado ? 'Enlace de la cartilla digital copiado.' : 'No se pudo copiar el enlace.', copiado ? 'success' : 'error');
 }
 
 async function compartirWhatsApp() {
@@ -1191,7 +1225,7 @@ async function compartirWhatsApp() {
     if (!mascota) return;
     
     const vet = obtenerVeterinaria() || { nombre: 'Nuestra Veterinaria' };
-    const cartillaUrl = `${window.location.origin}${window.location.pathname}?id=${mascota.id}`;
+    const cartillaUrl = construirUrlCartillaPublica(mascota.id);
     
     const txt = `Hola. Te comparto la Cartilla Digital de *${mascota.nombre}* (${mascota.especie}), emitida por *${vet.nombre}*.\n\n` +
                 `*Ficha Clínica:* ${mascota.codigo}\n\n` +
@@ -1226,6 +1260,55 @@ function formatearFechaLocal(fechaStr) {
     return `${d}/${m}/${a}`;
 }
 
+function obtenerEstadoPreventivoVisual(fechaProgramada, status, evaluador) {
+    if (status === 'asistio') {
+        return { status: 'success', label: 'Al día', daysLeft: Infinity };
+    }
+    if (status === 'no_asistio') {
+        return { status: 'danger', label: 'Vencida', daysLeft: -1 };
+    }
+    return evaluador(fechaProgramada);
+}
+
+function obtenerBadgeClase(estado) {
+    if (estado === 'success') return 'success';
+    if (estado === 'warning') return 'warning';
+    if (estado === 'danger') return 'danger';
+    return '';
+}
+
+function construirEstadoAsistenciaHtml(status, fechaAsistencia) {
+    if (status === 'asistio') {
+        return `
+            <span class="status-badge success">Asistió</span>
+            ${fechaAsistencia ? `<br><small style="color:var(--text-muted); font-size:11px;">${formatearFechaLocal(fechaAsistencia)}</small>` : ''}
+        `;
+    }
+    if (status === 'no_asistio') {
+        return '<span class="status-badge danger">No Asistió</span>';
+    }
+    if (status === 'reagendado') {
+        return '<span class="status-badge warning">Reagendado</span>';
+    }
+    return '<span class="status-badge secondary">Programada</span>';
+}
+
+function obtenerEventoClinicoActual(tipoEvento, idEvento) {
+    const mascota = UIState.mascotaActivaDetalle;
+    if (!mascota) return null;
+
+    if (tipoEvento === 'vacuna') {
+        return (mascota.vacunas || []).find(v => v.id === idEvento) || null;
+    }
+    if (tipoEvento === 'desparasitacion') {
+        return (mascota.desparasitaciones || []).find(d => d.id === idEvento) || null;
+    }
+    if (tipoEvento === 'control') {
+        return (mascota.controles || []).find(c => c.id === idEvento) || null;
+    }
+    return null;
+}
+
 /**
  * Retorna la foto de la mascota o genera un placeholder SVG específico por especie.
  */
@@ -1252,7 +1335,7 @@ function obtenerIndicadoresPreventivos(mascota) {
     
     (mascota.vacunas || []).forEach(v => {
         if (v.proximaDosis) {
-            const ev = evaluarEstadoVacuna(v.proximaDosis);
+            const ev = obtenerEstadoPreventivoVisual(v.proximaDosis, v.status, evaluarEstadoVacuna);
             if (ev.status === 'success') vacunasAlDia++;
             else if (ev.status === 'warning') vacunasProximas++;
             else if (ev.status === 'danger') vacunasVencidas++;
@@ -1261,7 +1344,7 @@ function obtenerIndicadoresPreventivos(mascota) {
     
     (mascota.desparasitaciones || []).forEach(d => {
         if (d.proximaAplicacion) {
-            const ed = evaluarEstadoDesparasitacion(d.proximaAplicacion);
+            const ed = obtenerEstadoPreventivoVisual(d.proximaAplicacion, d.status, evaluarEstadoDesparasitacion);
             if (ed.status === 'warning') desparasitacionProxima++;
             else if (ed.status === 'danger') desparasitacionVencida++;
         }
@@ -1725,7 +1808,9 @@ function capturarFotoCamara() {
         cerrarModalCamara();
         
         if (camaraContexto === 'registro') {
-            manejarSubidaFoto(file);
+            if (typeof window.manejarSubidaFotoMascota === 'function') {
+                window.manejarSubidaFotoMascota(file);
+            }
         } else if (camaraContexto === 'cartilla') {
             if (UIState.mascotaActivaId) {
                 mostrarToast('Guardando foto en el paciente...', 'info');
@@ -1753,22 +1838,42 @@ function capturarFotoCamara() {
 // ==========================================
 
 function abrirMenuEstado(btnElement, tipoEvento, idEvento) {
+    abrirModal('estado');
+
+    const eventoActual = obtenerEventoClinicoActual(tipoEvento, idEvento);
+    const estadoSelect = document.getElementById('estado-select');
+    const fechaAsistenciaInput = document.getElementById('estado-fecha-asistencia');
+    const fechaReagendadaInput = document.getElementById('estado-fecha-reagendada');
+
     document.getElementById('estado-tipo-evento').value = tipoEvento;
     document.getElementById('estado-evento-id').value = idEvento;
-    document.getElementById('estado-select').value = 'pendiente';
-    document.getElementById('estado-fecha-asistencia').value = new Date().toISOString().split('T')[0];
+    estadoSelect.value = ['asistio', 'no_asistio', 'reagendado'].includes(eventoActual?.status) ? eventoActual.status : 'asistio';
+    fechaAsistenciaInput.value = eventoActual?.fechaAsistencia || new Date().toISOString().split('T')[0];
+    fechaReagendadaInput.value = eventoActual?.proximaDosis || eventoActual?.proximaAplicacion || '';
     toggleFechaAsistencia();
-    
-    abrirModal('estado');
 }
 
 function toggleFechaAsistencia() {
+    const tipoEvento = document.getElementById('estado-tipo-evento').value;
     const estado = document.getElementById('estado-select').value;
     const groupFecha = document.getElementById('group-fecha-asistencia');
+    const groupFechaReagendada = document.getElementById('group-fecha-reagendada');
+    const ayuda = document.getElementById('estado-ayuda');
+    const admiteReagenda = tipoEvento === 'vacuna' || tipoEvento === 'desparasitacion';
+
+    groupFecha.style.display = estado === 'asistio' ? 'block' : 'none';
+    groupFechaReagendada.style.display = estado === 'reagendado' && admiteReagenda ? 'block' : 'none';
+
     if (estado === 'asistio') {
-        groupFecha.style.display = 'block';
+        ayuda.textContent = 'Se marcará el evento como cumplido y dejará de aparecer como vencido.';
+    } else if (estado === 'no_asistio') {
+        ayuda.textContent = 'El evento seguirá figurando como vencido hasta que se registre una nueva atención.';
+    } else if (estado === 'reagendado' && admiteReagenda) {
+        ayuda.textContent = 'Selecciona la nueva fecha programada. Esa fecha reemplazará la próxima dosis o aplicación.';
+    } else if (estado === 'reagendado') {
+        ayuda.textContent = 'Este tipo de evento no actualiza fecha desde este modal.';
     } else {
-        groupFecha.style.display = 'none';
+        ayuda.textContent = '';
     }
 }
 
@@ -1777,24 +1882,37 @@ async function guardarCambioEstado() {
     const idEvento = document.getElementById('estado-evento-id').value;
     const estado = document.getElementById('estado-select').value;
     let fechaAsistencia = document.getElementById('estado-fecha-asistencia').value;
-    
+    let fechaReagendada = document.getElementById('estado-fecha-reagendada').value;
+
     if (estado !== 'asistio') {
         fechaAsistencia = null;
+    }
+    if (estado !== 'reagendado') {
+        fechaReagendada = null;
     }
 
     if (!UIState.mascotaActivaId) return;
 
+    if (estado === 'asistio' && !fechaAsistencia) {
+        mostrarToast('Selecciona la fecha real de asistencia.', 'error');
+        return;
+    }
+    if (estado === 'reagendado' && (tipo === 'vacuna' || tipo === 'desparasitacion') && !fechaReagendada) {
+        mostrarToast('Selecciona la nueva fecha programada.', 'error');
+        return;
+    }
+
     try {
         let res;
         if (tipo === 'vacuna') {
-            res = await window.API.actualizarStatusVacuna(UIState.mascotaActivaId, idEvento, estado, fechaAsistencia);
+            res = await window.API.actualizarStatusVacuna(UIState.mascotaActivaId, idEvento, estado, fechaAsistencia, fechaReagendada);
         } else if (tipo === 'desparasitacion') {
-            res = await window.API.actualizarStatusDesparasitacion(UIState.mascotaActivaId, idEvento, estado, fechaAsistencia);
+            res = await window.API.actualizarStatusDesparasitacion(UIState.mascotaActivaId, idEvento, estado, fechaAsistencia, fechaReagendada);
         } else if (tipo === 'control') {
             res = await window.API.actualizarStatusControl(UIState.mascotaActivaId, idEvento, estado, fechaAsistencia);
         }
 
-        if (res && res.mensaje) {
+        if (res) {
             mostrarToast('Estado actualizado correctamente', 'success');
             cerrarModal('estado');
             await verCartillaMascota(UIState.mascotaActivaId); // Recargar cartilla
@@ -1803,6 +1921,6 @@ async function guardarCambioEstado() {
         }
     } catch (e) {
         console.error("Error cambiando estado", e);
-        mostrarToast('Error al comunicar con el servidor', 'error');
+        mostrarToast('Error del servidor: ' + e.message, 'error');
     }
 }

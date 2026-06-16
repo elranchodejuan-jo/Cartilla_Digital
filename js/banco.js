@@ -10,6 +10,97 @@ let cacheVacunas = [];
 let cacheInternos = [];
 let cacheExternos = [];
 
+function normalizarTexto(valor, fallback = '') {
+    return valor === null || valor === undefined ? fallback : String(valor);
+}
+
+function normalizarVacunaBanco(v = {}) {
+    return {
+        id: v.id,
+        nombre: normalizarTexto(v.nombre),
+        tipo: normalizarTexto(v.tipo, 'Vacuna'),
+        especie: normalizarTexto(v.especie, 'Ambos'),
+        enfermedades: normalizarTexto(v.enfermedades),
+        laboratorio: normalizarTexto(v.laboratorio),
+        lote: normalizarTexto(v.lote),
+        frecuencia: normalizarTexto(v.frecuencia),
+        observaciones: normalizarTexto(v.observaciones)
+    };
+}
+
+function normalizarInternoBanco(p = {}) {
+    return {
+        id: p.id,
+        nombre: normalizarTexto(p.nombre),
+        principioActivo: normalizarTexto(p.principioActivo || p.principio_activo),
+        especie: normalizarTexto(p.especie, 'Ambos'),
+        presentacion: normalizarTexto(p.presentacion || p.tipo, 'tableta'),
+        dosisRecomendada: normalizarTexto(p.dosisRecomendada || p.dosis),
+        rangoPeso: normalizarTexto(p.rangoPeso || p.rango_peso),
+        viaAdministracion: normalizarTexto(p.viaAdministracion || p.via, 'Oral'),
+        frecuenciaRecomendada: normalizarTexto(p.frecuenciaRecomendada || p.frecuencia),
+        parasitosCubre: normalizarTexto(p.parasitosCubre || p.parasitos),
+        laboratorio: normalizarTexto(p.laboratorio),
+        lote: normalizarTexto(p.lote),
+        observaciones: normalizarTexto(p.observaciones)
+    };
+}
+
+function normalizarExternoBanco(p = {}) {
+    return {
+        id: p.id,
+        nombre: normalizarTexto(p.nombre),
+        principioActivo: normalizarTexto(p.principioActivo || p.principio_activo),
+        especie: normalizarTexto(p.especie, 'Ambos'),
+        tipo: normalizarTexto(p.tipo, 'Tableta'),
+        rangoPeso: normalizarTexto(p.rangoPeso || p.rango_peso),
+        duracionProteccion: normalizarTexto(p.duracionProteccion || p.duracion),
+        frecuenciaRecomendada: normalizarTexto(p.frecuenciaRecomendada || p.frecuencia || p.dosis),
+        parasitosCubre: normalizarTexto(p.parasitosCubre || p.parasitos),
+        laboratorio: normalizarTexto(p.laboratorio),
+        lote: normalizarTexto(p.lote),
+        observaciones: normalizarTexto(p.observaciones),
+        advertencias: normalizarTexto(p.advertencias)
+    };
+}
+
+function normalizarEspecieParaBanco(especie) {
+    const valor = normalizarTexto(especie, 'Ambos').toLowerCase().trim();
+    if (valor === 'perro' || valor === 'canino' || valor === 'p') return 'canino';
+    if (valor === 'gato' || valor === 'felino' || valor === 'g') return 'felino';
+    if (valor === 'ambos') return 'ambos';
+    return valor;
+}
+
+function bancoCompatibleConEspecie(especieItem, especiePaciente) {
+    const item = normalizarEspecieParaBanco(especieItem);
+    const paciente = normalizarEspecieParaBanco(especiePaciente);
+    return item === 'ambos' || item === paciente;
+}
+
+async function cargarCacheBancoClinico(force = false) {
+    if (!window.API || !window.API.isLoggedIn()) return;
+
+    const tareas = [];
+    if (force || cacheVacunas.length === 0) {
+        tareas.push(window.API.obtenerBancoVacunas().then(data => {
+            cacheVacunas = (data || []).map(normalizarVacunaBanco);
+        }));
+    }
+    if (force || cacheInternos.length === 0) {
+        tareas.push(window.API.obtenerBancoInternos().then(data => {
+            cacheInternos = (data || []).map(normalizarInternoBanco);
+        }));
+    }
+    if (force || cacheExternos.length === 0) {
+        tareas.push(window.API.obtenerBancoExternos().then(data => {
+            cacheExternos = (data || []).map(normalizarExternoBanco);
+        }));
+    }
+
+    await Promise.all(tareas);
+}
+
 // Inicializar el Banco Clínico cuando sea necesario
 document.addEventListener('DOMContentLoaded', () => {
     configurarManejadoresBanco();
@@ -58,18 +149,18 @@ function renderizarBancoVacunas() {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Cargando...</td></tr>`;
     
     window.API.obtenerBancoVacunas().then(vacunas => {
-        cacheVacunas = vacunas || [];
+        cacheVacunas = (vacunas || []).map(normalizarVacunaBanco);
         if (!cacheVacunas || cacheVacunas.length === 0) {
             tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No hay vacunas registradas en el banco.</td></tr>`;
             return;
         }
         
-        tbody.innerHTML = vacunas.map(v => {
+        tbody.innerHTML = cacheVacunas.map(v => {
             return `
                 <tr>
                     <td data-label="Nombre Comercial"><strong>${v.nombre}</strong></td>
-                    <td data-label="Tipo"><span class="status-badge info">Vacuna</span></td>
-                    <td data-label="Especie"><span class="patient-badge ${v.especie && v.especie.toLowerCase() === 'canino' ? 'perro' : v.especie && v.especie.toLowerCase() === 'felino' ? 'gato' : ''}">${v.especie}</span></td>
+                    <td data-label="Tipo"><span class="status-badge info">${v.tipo || 'Vacuna'}</span></td>
+                    <td data-label="Especie"><span class="patient-badge ${normalizarEspecieParaBanco(v.especie) === 'canino' ? 'perro' : normalizarEspecieParaBanco(v.especie) === 'felino' ? 'gato' : ''}">${v.especie}</span></td>
                     <td data-label="Enfermedades"><span style="font-size:12px;">${v.enfermedades || 'N/A'}</span></td>
                     <td data-label="Laboratorio">${v.laboratorio || 'N/A'}</td>
                     <td data-label="Lote"><span style="font-family:monospace; font-size:12px;">${v.lote || 'N/A'}</span></td>
@@ -99,22 +190,22 @@ function renderizarBancoInternos() {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Cargando...</td></tr>`;
 
     window.API.obtenerBancoInternos().then(productos => {
-        cacheInternos = productos || [];
+        cacheInternos = (productos || []).map(normalizarInternoBanco);
         if (!cacheInternos || cacheInternos.length === 0) {
             tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No hay antiparasitarios internos en el banco.</td></tr>`;
             return;
         }
         
-        tbody.innerHTML = productos.map(p => {
+        tbody.innerHTML = cacheInternos.map(p => {
             return `
                 <tr>
                     <td data-label="Nombre"><strong>${p.nombre}</strong></td>
-                    <td data-label="Principio Activo"><span style="font-size:12px; color:var(--text-muted);">${p.parasitos || 'N/A'}</span></td>
-                    <td data-label="Especie"><span class="patient-badge ${p.especie && p.especie.toLowerCase() === 'canino' ? 'perro' : p.especie && p.especie.toLowerCase() === 'felino' ? 'gato' : ''}">${p.especie}</span></td>
-                    <td data-label="Presentación"><span class="status-badge info" style="text-transform: capitalize;">${p.tipo || 'N/A'}</span></td>
-                    <td data-label="Dosis">${p.dosis || 'N/A'}</td>
-                    <td data-label="Vía">${p.via || 'N/A'}</td>
-                    <td data-label="Rango Peso">${p.rango_peso || 'N/A'}</td>
+                    <td data-label="Principio Activo"><span style="font-size:12px; color:var(--text-muted);">${p.principioActivo || 'N/A'}</span></td>
+                    <td data-label="Especie"><span class="patient-badge ${normalizarEspecieParaBanco(p.especie) === 'canino' ? 'perro' : normalizarEspecieParaBanco(p.especie) === 'felino' ? 'gato' : ''}">${p.especie}</span></td>
+                    <td data-label="Presentación"><span class="status-badge info" style="text-transform: capitalize;">${p.presentacion || 'N/A'}</span></td>
+                    <td data-label="Dosis">${p.dosisRecomendada || 'N/A'}</td>
+                    <td data-label="Vía">${p.viaAdministracion || 'N/A'}</td>
+                    <td data-label="Rango Peso">${p.rangoPeso || 'N/A'}</td>
                     <td data-label="Acciones">
                         <div style="display:flex; gap:6px; justify-content: flex-end;">
                             <button class="btn btn-secondary btn-icon-only" onclick="abrirModalBanco('interno', '${p.id}')" title="Editar">✏️</button>
@@ -140,21 +231,21 @@ function renderizarBancoExternos() {
     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;">Cargando...</td></tr>`;
 
     window.API.obtenerBancoExternos().then(productos => {
-        cacheExternos = productos || [];
+        cacheExternos = (productos || []).map(normalizarExternoBanco);
         if (!cacheExternos || cacheExternos.length === 0) {
             tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No hay antiparasitarios externos en el banco.</td></tr>`;
             return;
         }
         
-        tbody.innerHTML = productos.map(p => {
+        tbody.innerHTML = cacheExternos.map(p => {
             return `
                 <tr>
                     <td data-label="Nombre"><strong>${p.nombre}</strong></td>
-                    <td data-label="Principio Activo"><span style="font-size:12px; color:var(--text-muted);">${p.parasitos || 'N/A'}</span></td>
-                    <td data-label="Especie"><span class="patient-badge ${p.especie && p.especie.toLowerCase() === 'canino' ? 'perro' : p.especie && p.especie.toLowerCase() === 'felino' ? 'gato' : ''}">${p.especie}</span></td>
+                    <td data-label="Principio Activo"><span style="font-size:12px; color:var(--text-muted);">${p.principioActivo || 'N/A'}</span></td>
+                    <td data-label="Especie"><span class="patient-badge ${normalizarEspecieParaBanco(p.especie) === 'canino' ? 'perro' : normalizarEspecieParaBanco(p.especie) === 'felino' ? 'gato' : ''}">${p.especie}</span></td>
                     <td data-label="Tipo"><span class="status-badge warning">${p.tipo || 'N/A'}</span></td>
-                    <td data-label="Rango Peso">${p.rango_peso || 'N/A'}</td>
-                    <td data-label="Dosis">${p.dosis || 'N/A'}</td>
+                    <td data-label="Rango Peso">${p.rangoPeso || 'N/A'}</td>
+                    <td data-label="Dosis">${p.frecuenciaRecomendada || p.duracionProteccion || 'N/A'}</td>
                     <td data-label="Acciones">
                         <div style="display:flex; gap:6px; justify-content: flex-end;">
                             <button class="btn btn-secondary btn-icon-only" onclick="abrirModalBanco('externo', '${p.id}')" title="Editar">✏️</button>
@@ -282,6 +373,7 @@ function configurarManejadoresBanco() {
             const id = document.getElementById('banco-vac-id').value;
             const datos = {
                 nombre: document.getElementById('banco-vac-nombre').value.trim(),
+                tipo: document.getElementById('banco-vac-tipo').value.trim(),
                 especie: document.getElementById('banco-vac-especie').value,
                 enfermedades: document.getElementById('banco-vac-enfermedades').value.trim(),
                 laboratorio: document.getElementById('banco-vac-laboratorio').value.trim(),
@@ -325,12 +417,22 @@ function configurarManejadoresBanco() {
             const id = document.getElementById('banco-int-id').value;
             const datos = {
                 nombre: document.getElementById('banco-int-nombre').value.trim(),
+                principioActivo: document.getElementById('banco-int-principio').value.trim(),
                 especie: document.getElementById('banco-int-especie').value,
+                presentacion: document.getElementById('banco-int-presentacion').value,
                 tipo: document.getElementById('banco-int-presentacion').value,
+                dosisRecomendada: document.getElementById('banco-int-dosis').value.trim(),
                 dosis: document.getElementById('banco-int-dosis').value.trim(),
+                rangoPeso: document.getElementById('banco-int-peso').value.trim(),
                 rango_peso: document.getElementById('banco-int-peso').value.trim(),
+                viaAdministracion: document.getElementById('banco-int-via').value.trim(),
                 via: document.getElementById('banco-int-via').value.trim(),
+                frecuenciaRecomendada: document.getElementById('banco-int-frecuencia').value.trim(),
+                frecuencia: document.getElementById('banco-int-frecuencia').value.trim(),
+                parasitosCubre: document.getElementById('banco-int-parasitos').value.trim(),
                 parasitos: document.getElementById('banco-int-parasitos').value.trim(),
+                laboratorio: document.getElementById('banco-int-laboratorio').value.trim(),
+                lote: document.getElementById('banco-int-lote').value.trim(),
                 observaciones: document.getElementById('banco-int-obs').value.trim()
             };
             
@@ -369,13 +471,23 @@ function configurarManejadoresBanco() {
             const id = document.getElementById('banco-ext-id').value;
             const datos = {
                 nombre: document.getElementById('banco-ext-nombre').value.trim(),
+                principioActivo: document.getElementById('banco-ext-principio').value.trim(),
                 especie: document.getElementById('banco-ext-especie').value,
                 tipo: document.getElementById('banco-ext-tipo').value,
+                rangoPeso: document.getElementById('banco-ext-peso').value.trim(),
                 rango_peso: document.getElementById('banco-ext-peso').value.trim(),
+                duracionProteccion: document.getElementById('banco-ext-duracion').value.trim(),
+                duracion: document.getElementById('banco-ext-duracion').value.trim(),
+                frecuenciaRecomendada: document.getElementById('banco-ext-frecuencia').value.trim(),
+                frecuencia: document.getElementById('banco-ext-frecuencia').value.trim(),
+                parasitosCubre: document.getElementById('banco-ext-parasitos').value.trim(),
                 parasitos: document.getElementById('banco-ext-parasitos').value.trim(),
-                dosis: document.getElementById('banco-ext-frecuencia').value.trim(), // Reusing this for Dosis in UI just to match the old form for now, wait I should use duracion as dosis or add dosis. Let's just pass what we can.
-                via: 'Tópica/Oral', // Default
-                observaciones: document.getElementById('banco-ext-obs').value.trim()
+                dosis: document.getElementById('banco-ext-frecuencia').value.trim(),
+                via: 'Tópica/Oral',
+                laboratorio: document.getElementById('banco-ext-laboratorio').value.trim(),
+                lote: document.getElementById('banco-ext-lote').value.trim(),
+                observaciones: document.getElementById('banco-ext-obs').value.trim(),
+                advertencias: document.getElementById('banco-ext-advertencias').value.trim()
             };
             
             if (!datos.nombre) {
@@ -420,9 +532,7 @@ function cargarSelectVacunasBanco(especiePaciente) {
     const vacunas = cacheVacunas;
     
     // Filtrar por especie recomendada ('Perro', 'Gato', o 'Ambos')
-    const filtradas = vacunas.filter(v => {
-        return v.especie === 'Ambos' || v.especie.toLowerCase() === especiePaciente.toLowerCase();
-    });
+    const filtradas = vacunas.filter(v => bancoCompatibleConEspecie(v.especie, especiePaciente));
     
     filtradas.forEach(v => {
         const opt = document.createElement('option');
@@ -443,14 +553,12 @@ function cargarSelectInternosBanco(especiePaciente) {
     select.innerHTML = '<option value="">-- Seleccionar para autocompletar --</option>';
     const productos = cacheInternos;
     
-    const filtrados = productos.filter(p => {
-        return p.especie === 'Ambos' || p.especie.toLowerCase() === especiePaciente.toLowerCase();
-    });
+    const filtrados = productos.filter(p => bancoCompatibleConEspecie(p.especie, especiePaciente));
     
     filtrados.forEach(p => {
         const opt = document.createElement('option');
         opt.value = p.id;
-        opt.textContent = `${p.nombre} (${p.principioActivo || 'N/A'}) - Vía: ${p.viaAdministracion}`;
+        opt.textContent = `${p.nombre} (${p.principioActivo || 'N/A'}) - Vía: ${p.viaAdministracion || 'N/A'}`;
         select.appendChild(opt);
     });
 }
@@ -466,14 +574,12 @@ function cargarSelectExternosBanco(especiePaciente) {
     select.innerHTML = '<option value="">-- Seleccionar para autocompletar --</option>';
     const productos = cacheExternos;
     
-    const filtrados = productos.filter(p => {
-        return p.especie === 'Ambos' || p.especie.toLowerCase() === especiePaciente.toLowerCase();
-    });
+    const filtrados = productos.filter(p => bancoCompatibleConEspecie(p.especie, especiePaciente));
     
     filtrados.forEach(p => {
         const opt = document.createElement('option');
         opt.value = p.id;
-        opt.textContent = `${p.nombre} (${p.tipo}) - Peso: ${p.rangoPeso || 'Cualquiera'}`;
+        opt.textContent = `${p.nombre} (${p.tipo || 'Producto'}) - Peso: ${p.rangoPeso || 'Cualquiera'}`;
         select.appendChild(opt);
     });
 }
@@ -506,11 +612,12 @@ function autocompletarInternoDesdeBanco(id) {
     if (!p) return;
     
     document.getElementById('des-int-producto').value = p.nombre;
-    document.getElementById('des-int-dosis').value = p.dosis || '';
-    document.getElementById('des-int-via').value = p.via || 'Oral';
+    document.getElementById('des-int-dosis').value = p.dosisRecomendada || '';
+    document.getElementById('des-int-via').value = p.viaAdministracion || 'Oral';
     
     let obs = '';
-    if (p.parasitos) obs += `Parásitos: ${p.parasitos}. `;
+    if (p.parasitosCubre) obs += `Parásitos: ${p.parasitosCubre}. `;
+    if (p.frecuenciaRecomendada) obs += `Frecuencia: ${p.frecuenciaRecomendada}. `;
     if (p.lote) obs += `Lote: ${p.lote}. `;
     if (p.observaciones) obs += p.observaciones;
     document.getElementById('des-int-obs').value = obs.trim();
@@ -529,13 +636,15 @@ function autocompletarExternoDesdeBanco(id) {
     
     document.getElementById('des-ext-producto').value = p.nombre;
     document.getElementById('des-ext-tipo').value = p.tipo || 'Tableta';
-    document.getElementById('des-ext-peso').value = p.rango_peso || '';
-    document.getElementById('des-ext-parasitos').value = p.parasitos || '';
+    document.getElementById('des-ext-peso').value = p.rangoPeso || '';
+    document.getElementById('des-ext-parasitos').value = p.parasitosCubre || '';
     
     let obs = '';
-    if (p.dosis) obs += `Frecuencia: ${p.dosis}. `;
+    if (p.duracionProteccion) obs += `Duración: ${p.duracionProteccion}. `;
+    if (p.frecuenciaRecomendada) obs += `Frecuencia: ${p.frecuenciaRecomendada}. `;
     if (p.lote) obs += `Lote: ${p.lote}. `;
     if (p.observaciones) obs += p.observaciones;
+    if (p.advertencias) obs += ` Advertencias: ${p.advertencias}`;
     document.getElementById('des-ext-obs').value = obs.trim();
     
     mostrarToast(`Autocompletado antiparasitario externo: ${p.nombre}`, 'info');

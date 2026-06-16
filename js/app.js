@@ -628,6 +628,8 @@ function cerrarSesionClinica() {
     mostrarToast('Sesión cerrada correctamente.', 'info');
     const logoutBtn = document.getElementById('nav-btn-logout');
     if (logoutBtn) logoutBtn.style.display = 'none';
+    actualizarUIConEstadoAuth(false);
+    navegarA('login');
 }
 
 /**

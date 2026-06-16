@@ -172,6 +172,23 @@ body.public-view .header {
     display: inline;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.api-env-indicator {
+    display: none;
+    padding: 4px 8px;
+    border: 1px solid var(--border-gray);
+    border-radius: var(--radius-full);
+    background: var(--card-bg);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+}
+
 /* --- Botones --- */
 .btn {
     display: inline-flex;
@@ -1778,5 +1795,4 @@ body.public-view #theme-toggle {
 body.public-view .no-public {
     display: none !important;
 }
-
 

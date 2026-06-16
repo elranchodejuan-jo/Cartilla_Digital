@@ -1,9 +1,9 @@
--- Script de Inicialización de Base de Datos para PostgreSQL (Cartilla Digital)
+-- Script de inicializacion de base de datos para PostgreSQL (Cartilla Digital)
 
--- Habilitar extensión para generación de UUIDs si no está activa
+-- Habilitar extension para generacion de UUIDs si no esta activa
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. TABLA: VETERINARIAS (Clínicas / Multitenant)
+-- 1. TABLA: VETERINARIAS (Clinicas / multitenant)
 CREATE TABLE IF NOT EXISTS veterinarias (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -16,7 +16,6 @@ CREATE TABLE IF NOT EXISTS veterinarias (
     fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indices para búsquedas de login rápidos
 CREATE INDEX IF NOT EXISTS idx_veterinarias_email ON veterinarias(email);
 CREATE INDEX IF NOT EXISTS idx_veterinarias_iniciales ON veterinarias(iniciales);
 
@@ -41,11 +40,23 @@ CREATE TABLE IF NOT EXISTS mascotas (
     fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indices de mascota por clínica y búsquedas de QR
 CREATE INDEX IF NOT EXISTS idx_mascotas_veterinaria ON mascotas(veterinaria_id);
 CREATE INDEX IF NOT EXISTS idx_mascotas_codigo ON mascotas(codigo);
 
--- 3. TABLA: VACUNAS
+-- 3. TABLA: EQUIPO VETERINARIO
+CREATE TABLE IF NOT EXISTS equipo_veterinario (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    veterinaria_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+    nombre VARCHAR(150) NOT NULL,
+    cargo VARCHAR(100) NOT NULL,
+    estado VARCHAR(20) DEFAULT 'activo',
+    es_principal BOOLEAN DEFAULT false,
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipo_veterinaria ON equipo_veterinario(veterinaria_id);
+
+-- 4. TABLA: VACUNAS
 CREATE TABLE IF NOT EXISTS vacunas (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     mascota_id UUID NOT NULL REFERENCES mascotas(id) ON DELETE CASCADE,
@@ -56,18 +67,21 @@ CREATE TABLE IF NOT EXISTS vacunas (
     proxima_dosis DATE,
     lote VARCHAR(100),
     responsable VARCHAR(150) NOT NULL,
-    observaciones TEXT
+    responsable_id UUID REFERENCES equipo_veterinario(id) ON DELETE SET NULL,
+    observaciones TEXT,
+    status VARCHAR(20) DEFAULT 'pendiente',
+    fecha_asistencia DATE
 );
 
 CREATE INDEX IF NOT EXISTS idx_vacunas_mascota ON vacunas(mascota_id);
 
--- 4. TABLA: DESPARASITACIONES (Internas y Externas)
+-- 5. TABLA: DESPARASITACIONES (Internas y externas)
 CREATE TABLE IF NOT EXISTS desparasitaciones (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     mascota_id UUID NOT NULL REFERENCES mascotas(id) ON DELETE CASCADE,
-    tipo VARCHAR(20) NOT NULL DEFAULT 'interna', -- 'interna' o 'externa'
+    tipo VARCHAR(20) NOT NULL DEFAULT 'interna',
     producto VARCHAR(150) NOT NULL,
-    tipo_producto VARCHAR(50), -- tableta, pipeta, collar, etc.
+    tipo_producto VARCHAR(50),
     rango_peso VARCHAR(100),
     parasitos_cubre VARCHAR(255),
     fecha_aplicacion DATE NOT NULL,
@@ -75,12 +89,15 @@ CREATE TABLE IF NOT EXISTS desparasitaciones (
     dosis VARCHAR(100),
     via VARCHAR(50),
     responsable VARCHAR(150) NOT NULL,
-    observaciones TEXT
+    responsable_id UUID REFERENCES equipo_veterinario(id) ON DELETE SET NULL,
+    observaciones TEXT,
+    status VARCHAR(20) DEFAULT 'pendiente',
+    fecha_asistencia DATE
 );
 
 CREATE INDEX IF NOT EXISTS idx_desparasitaciones_mascota ON desparasitaciones(mascota_id);
 
--- 5. TABLA: CONTROLES CLÍNICOS
+-- 6. TABLA: CONTROLES CLINICOS
 CREATE TABLE IF NOT EXISTS controles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     mascota_id UUID NOT NULL REFERENCES mascotas(id) ON DELETE CASCADE,
@@ -94,26 +111,30 @@ CREATE TABLE IF NOT EXISTS controles (
     diagnostico TEXT,
     tratamiento TEXT,
     recomendaciones TEXT,
-    proximo_control DATE
+    proximo_control DATE,
+    responsable VARCHAR(150),
+    responsable_id UUID REFERENCES equipo_veterinario(id) ON DELETE SET NULL,
+    status VARCHAR(20) DEFAULT 'pendiente',
+    fecha_asistencia DATE
 );
 
 CREATE INDEX IF NOT EXISTS idx_controles_mascota ON controles(mascota_id);
 
--- 6. TABLA: TRANSFERENCIAS (Historial e inicio de transferencias entre clínicas)
+-- 7. TABLA: TRANSFERENCIAS
 CREATE TABLE IF NOT EXISTS transferencias (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     mascota_id UUID NOT NULL REFERENCES mascotas(id) ON DELETE CASCADE,
     veterinaria_origen_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
-    veterinaria_destino_id UUID REFERENCES veterinarias(id) ON DELETE CASCADE, -- NULL si es transferencia abierta con código
-    codigo_transferencia VARCHAR(20) UNIQUE NOT NULL, -- ej: TX-892A41
-    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente', -- 'pendiente', 'completada', 'expirada'
+    veterinaria_destino_id UUID REFERENCES veterinarias(id) ON DELETE CASCADE,
+    codigo_transferencia VARCHAR(20) UNIQUE NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente',
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     fecha_expiracion TIMESTAMP NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_transferencias_codigo ON transferencias(codigo_transferencia);
 
--- 7. TABLA: TOKENS DE RECUPERACIÓN DE CONTRASEÑA
+-- 8. TABLA: TOKENS DE RECUPERACION DE PASSWORD
 CREATE TABLE IF NOT EXISTS password_resets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     veterinaria_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
@@ -124,3 +145,62 @@ CREATE TABLE IF NOT EXISTS password_resets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token);
+
+-- 9. TABLAS: BANCO CLINICO
+CREATE TABLE IF NOT EXISTS banco_vacunas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    veterinaria_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+    nombre VARCHAR(150) NOT NULL,
+    tipo VARCHAR(80),
+    especie VARCHAR(50) DEFAULT 'Ambos',
+    enfermedades TEXT,
+    laboratorio VARCHAR(100),
+    lote VARCHAR(50),
+    frecuencia VARCHAR(50),
+    observaciones TEXT,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_banco_vacunas_veterinaria ON banco_vacunas(veterinaria_id);
+
+CREATE TABLE IF NOT EXISTS banco_internos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    veterinaria_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+    nombre VARCHAR(150) NOT NULL,
+    principio_activo VARCHAR(150),
+    especie VARCHAR(50) DEFAULT 'Ambos',
+    tipo VARCHAR(50),
+    rango_peso VARCHAR(50),
+    parasitos TEXT,
+    dosis VARCHAR(50),
+    via VARCHAR(50),
+    frecuencia VARCHAR(100),
+    laboratorio VARCHAR(100),
+    lote VARCHAR(50),
+    observaciones TEXT,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_banco_internos_veterinaria ON banco_internos(veterinaria_id);
+
+CREATE TABLE IF NOT EXISTS banco_externos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    veterinaria_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+    nombre VARCHAR(150) NOT NULL,
+    principio_activo VARCHAR(150),
+    especie VARCHAR(50) DEFAULT 'Ambos',
+    tipo VARCHAR(50),
+    rango_peso VARCHAR(50),
+    duracion VARCHAR(100),
+    parasitos TEXT,
+    dosis VARCHAR(50),
+    via VARCHAR(50),
+    frecuencia VARCHAR(100),
+    laboratorio VARCHAR(100),
+    lote VARCHAR(50),
+    observaciones TEXT,
+    advertencias TEXT,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_banco_externos_veterinaria ON banco_externos(veterinaria_id);

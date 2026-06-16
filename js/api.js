@@ -7,8 +7,8 @@
 const getApiBaseUrl = () => {
     const hostname = window.location.hostname;
     
-    // Si estamos en localhost o 127.0.0.1
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    // Si estamos en localhost, 127.0.0.1, o abriendo el archivo directamente (file://)
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '') {
         return 'http://localhost:3000/api';
     }
     
@@ -28,6 +28,27 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
+
+// Actualizar indicador de entorno en la UI
+window.addEventListener('DOMContentLoaded', () => {
+    const envIndicator = document.getElementById('api-env-indicator');
+    if (envIndicator) {
+        envIndicator.style.display = 'inline-block';
+        if (API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1')) {
+            envIndicator.textContent = '🔌 Local';
+            envIndicator.style.color = '#10b981'; // Verde
+            envIndicator.style.borderColor = '#10b981';
+        } else if (API_BASE_URL.includes('onrender.com')) {
+            envIndicator.textContent = '☁️ Prod (Render)';
+            envIndicator.style.color = '#3b82f6'; // Azul
+            envIndicator.style.borderColor = '#3b82f6';
+        } else {
+            envIndicator.textContent = '🌐 Custom API';
+            envIndicator.style.color = '#f59e0b'; // Naranja
+            envIndicator.style.borderColor = '#f59e0b';
+        }
+    }
+});
 
 const API = {
     // --- SESIÓN Y TOKEN ---
@@ -241,11 +262,11 @@ const API = {
         return this.handleResponse(res);
     },
 
-    async actualizarStatusVacuna(mascotaId, vacunaId, status, fechaAsistencia) {
+    async actualizarStatusVacuna(mascotaId, vacunaId, status, fechaAsistencia, proximaDosis) {
         const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/vacunas/${vacunaId}/status`, {
             method: 'PATCH',
             headers: this.getHeaders(true),
-            body: JSON.stringify({ status, fechaAsistencia })
+            body: JSON.stringify({ status, fechaAsistencia, proximaDosis })
         });
         return this.handleResponse(res);
     },
@@ -277,11 +298,11 @@ const API = {
         return this.handleResponse(res);
     },
 
-    async actualizarStatusDesparasitacion(mascotaId, desparasitacionId, status, fechaAsistencia) {
+    async actualizarStatusDesparasitacion(mascotaId, desparasitacionId, status, fechaAsistencia, proximaAplicacion) {
         const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/desparasitaciones/${desparasitacionId}/status`, {
             method: 'PATCH',
             headers: this.getHeaders(true),
-            body: JSON.stringify({ status, fechaAsistencia })
+            body: JSON.stringify({ status, fechaAsistencia, proximaAplicacion })
         });
         return this.handleResponse(res);
     },
@@ -439,3 +460,8 @@ const API = {
         return this.handleResponse(res);
     }
 };
+
+// Los scripts antiguos y varios handlers inline usan window.API de forma explicita.
+// Mantenerlo publicado evita fallos en Banco Clinico, camara, estados y fotos.
+window.API = API;
+window.API_BASE_URL = API_BASE_URL;

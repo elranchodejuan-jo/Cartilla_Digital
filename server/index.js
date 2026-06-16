@@ -336,7 +336,10 @@ app.get('/api/mascotas', authMiddleware, async (req, res) => {
                     proximaDosis: v.proxima_dosis ? v.proxima_dosis.toISOString().split('T')[0] : '',
                     lote: v.lote || '',
                     responsable: v.responsable,
-                    observaciones: v.observaciones || ''
+                    responsableId: v.responsable_id || null,
+                    observaciones: v.observaciones || '',
+                    status: v.status || 'pendiente',
+                    fechaAsistencia: v.fecha_asistencia ? v.fecha_asistencia.toISOString().split('T')[0] : null
                 });
             });
             
@@ -358,7 +361,10 @@ app.get('/api/mascotas', authMiddleware, async (req, res) => {
                     dosis: d.dosis || '',
                     via: d.via || 'Oral',
                     responsable: d.responsable,
-                    observaciones: d.observaciones || ''
+                    responsableId: d.responsable_id || null,
+                    observaciones: d.observaciones || '',
+                    status: d.status || 'pendiente',
+                    fechaAsistencia: d.fecha_asistencia ? d.fecha_asistencia.toISOString().split('T')[0] : null
                 });
             });
         }
@@ -517,6 +523,7 @@ app.get('/api/mascotas/:id', authMiddleware, async (req, res) => {
             proximaDosis: v.proxima_dosis ? v.proxima_dosis.toISOString().split('T')[0] : '',
             lote: v.lote || '',
             responsable: v.responsable,
+            responsableId: v.responsable_id || null,
             observaciones: v.observaciones || '',
             status: v.status || 'pendiente',
             fechaAsistencia: v.fecha_asistencia ? v.fecha_asistencia.toISOString().split('T')[0] : null
@@ -536,6 +543,7 @@ app.get('/api/mascotas/:id', authMiddleware, async (req, res) => {
             dosis: d.dosis || '',
             via: d.via || 'Oral',
             responsable: d.responsable,
+            responsableId: d.responsable_id || null,
             observaciones: d.observaciones || '',
             status: d.status || 'pendiente',
             fechaAsistencia: d.fecha_asistencia ? d.fecha_asistencia.toISOString().split('T')[0] : null
@@ -556,6 +564,8 @@ app.get('/api/mascotas/:id', authMiddleware, async (req, res) => {
             tratamiento: c.tratamiento || '',
             recomendaciones: c.recomendaciones || '',
             proximoControl: c.proximo_control ? c.proximo_control.toISOString().split('T')[0] : '',
+            responsable: c.responsable || '',
+            responsableId: c.responsable_id || null,
             status: c.status || 'pendiente',
             fechaAsistencia: c.fecha_asistencia ? c.fecha_asistencia.toISOString().split('T')[0] : null
         }));
@@ -734,7 +744,7 @@ app.put('/api/mascotas/:id/vacunas/:vacunaId', authMiddleware, async (req, res) 
 
 app.patch('/api/mascotas/:id/vacunas/:vacunaId/status', authMiddleware, async (req, res) => {
     const { id, vacunaId } = req.params;
-    const { status, fechaAsistencia } = req.body;
+    const { status, fechaAsistencia, proximaDosis } = req.body;
     
     try {
         const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
@@ -742,12 +752,24 @@ app.patch('/api/mascotas/:id/vacunas/:vacunaId/status', authMiddleware, async (r
             return res.status(404).json({ error: 'Mascota no encontrada.' });
         }
         
+        if (status === 'reagendado' && !proximaDosis) {
+            return res.status(400).json({ error: 'La nueva fecha de próxima dosis es obligatoria al reagendar.' });
+        }
+
         const queryText = `
             UPDATE vacunas
-            SET status = $1, fecha_asistencia = $2
-            WHERE id = $3 AND mascota_id = $4
+            SET status = $1,
+                fecha_asistencia = $2,
+                proxima_dosis = CASE WHEN $3::date IS NOT NULL THEN $3::date ELSE proxima_dosis END
+            WHERE id = $4 AND mascota_id = $5
         `;
-        const result = await db.query(queryText, [status, fechaAsistencia || null, vacunaId, id]);
+        const result = await db.query(queryText, [
+            status,
+            fechaAsistencia || null,
+            status === 'reagendado' ? proximaDosis : null,
+            vacunaId,
+            id
+        ]);
         
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Vacuna no encontrada.' });
@@ -859,7 +881,7 @@ app.put('/api/mascotas/:id/desparasitaciones/:desparasitacionId', authMiddleware
 
 app.patch('/api/mascotas/:id/desparasitaciones/:desparasitacionId/status', authMiddleware, async (req, res) => {
     const { id, desparasitacionId } = req.params;
-    const { status, fechaAsistencia } = req.body;
+    const { status, fechaAsistencia, proximaAplicacion } = req.body;
     
     try {
         const mCheck = await db.query('SELECT id FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
@@ -867,12 +889,24 @@ app.patch('/api/mascotas/:id/desparasitaciones/:desparasitacionId/status', authM
             return res.status(404).json({ error: 'Mascota no encontrada.' });
         }
         
+        if (status === 'reagendado' && !proximaAplicacion) {
+            return res.status(400).json({ error: 'La nueva fecha de próxima aplicación es obligatoria al reagendar.' });
+        }
+
         const queryText = `
             UPDATE desparasitaciones
-            SET status = $1, fecha_asistencia = $2
-            WHERE id = $3 AND mascota_id = $4
+            SET status = $1,
+                fecha_asistencia = $2,
+                proxima_aplicacion = CASE WHEN $3::date IS NOT NULL THEN $3::date ELSE proxima_aplicacion END
+            WHERE id = $4 AND mascota_id = $5
         `;
-        const result = await db.query(queryText, [status, fechaAsistencia || null, desparasitacionId, id]);
+        const result = await db.query(queryText, [
+            status,
+            fechaAsistencia || null,
+            status === 'reagendado' ? proximaAplicacion : null,
+            desparasitacionId,
+            id
+        ]);
         
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Desparasitación no encontrada.' });
@@ -1089,7 +1123,7 @@ app.delete('/api/mascotas/:id/controles/:controlId', authMiddleware, async (req,
         if (weightRes.rows.length > 0) {
             await db.query('UPDATE mascotas SET peso = $1 WHERE id = $2', [weightRes.rows[0].peso, id]);
         } else {
-            await db.query('UPDATE mascotas SET peso = NULL WHERE id = $2', [id]);
+            await db.query('UPDATE mascotas SET peso = NULL WHERE id = $1', [id]);
         }
         
         res.json({ mensaje: 'Control clínico eliminado correctamente.' });
@@ -1226,7 +1260,9 @@ app.get('/api/public/mascotas/:id', async (req, res) => {
             proximaDosis: v.proxima_dosis ? v.proxima_dosis.toISOString().split('T')[0] : '',
             lote: v.lote || '',
             responsable: v.responsable,
-            observaciones: v.observaciones || ''
+            observaciones: v.observaciones || '',
+            status: v.status || 'pendiente',
+            fechaAsistencia: v.fecha_asistencia ? v.fecha_asistencia.toISOString().split('T')[0] : null
         }));
         
         // Obtener desparasitaciones
@@ -1243,7 +1279,9 @@ app.get('/api/public/mascotas/:id', async (req, res) => {
             dosis: d.dosis || '',
             via: d.via || 'Oral',
             responsable: d.responsable,
-            observaciones: d.observaciones || ''
+            observaciones: d.observaciones || '',
+            status: d.status || 'pendiente',
+            fechaAsistencia: d.fecha_asistencia ? d.fecha_asistencia.toISOString().split('T')[0] : null
         }));
         
         // Obtener controles
@@ -1260,7 +1298,10 @@ app.get('/api/public/mascotas/:id', async (req, res) => {
             diagnostico: c.diagnostico || '',
             tratamiento: c.tratamiento || '',
             recomendaciones: c.recomendaciones || '',
-            proximoControl: c.proximo_control ? c.proximo_control.toISOString().split('T')[0] : ''
+            proximoControl: c.proximo_control ? c.proximo_control.toISOString().split('T')[0] : '',
+            responsable: c.responsable || '',
+            status: c.status || 'pendiente',
+            fechaAsistencia: c.fecha_asistencia ? c.fecha_asistencia.toISOString().split('T')[0] : null
         }));
         
         res.json({
@@ -1457,6 +1498,47 @@ async function subirImagenAStorage(base64String, carpeta = 'general') {
         return base64String; // Fallback: devolver Base64
     }
 }
+
+function textoLimpio(valor, fallback = '') {
+    if (valor === null || valor === undefined) return fallback;
+    return String(valor).trim();
+}
+
+function payloadBancoInterno(body) {
+    return {
+        nombre: textoLimpio(body.nombre),
+        principioActivo: textoLimpio(body.principioActivo || body.principio_activo),
+        especie: textoLimpio(body.especie, 'Ambos') || 'Ambos',
+        tipo: textoLimpio(body.presentacion || body.tipo),
+        rangoPeso: textoLimpio(body.rangoPeso || body.rango_peso),
+        parasitos: textoLimpio(body.parasitosCubre || body.parasitos),
+        dosis: textoLimpio(body.dosisRecomendada || body.dosis),
+        via: textoLimpio(body.viaAdministracion || body.via),
+        frecuencia: textoLimpio(body.frecuenciaRecomendada || body.frecuencia),
+        laboratorio: textoLimpio(body.laboratorio),
+        lote: textoLimpio(body.lote),
+        observaciones: textoLimpio(body.observaciones)
+    };
+}
+
+function payloadBancoExterno(body) {
+    return {
+        nombre: textoLimpio(body.nombre),
+        principioActivo: textoLimpio(body.principioActivo || body.principio_activo),
+        especie: textoLimpio(body.especie, 'Ambos') || 'Ambos',
+        tipo: textoLimpio(body.tipo),
+        rangoPeso: textoLimpio(body.rangoPeso || body.rango_peso),
+        duracion: textoLimpio(body.duracionProteccion || body.duracion),
+        parasitos: textoLimpio(body.parasitosCubre || body.parasitos),
+        dosis: textoLimpio(body.dosis),
+        via: textoLimpio(body.via),
+        frecuencia: textoLimpio(body.frecuenciaRecomendada || body.frecuencia),
+        laboratorio: textoLimpio(body.laboratorio),
+        lote: textoLimpio(body.lote),
+        observaciones: textoLimpio(body.observaciones),
+        advertencias: textoLimpio(body.advertencias)
+    };
+}
 // ==========================================
 // BANCOS CLÍNICOS
 // ==========================================
@@ -1473,12 +1555,15 @@ app.get('/api/banco/vacunas', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/banco/vacunas', authMiddleware, async (req, res) => {
-    const { nombre, especie, enfermedades, laboratorio, lote, frecuencia, observaciones } = req.body;
+    const { nombre, tipo, especie, enfermedades, laboratorio, lote, frecuencia, observaciones } = req.body;
     try {
+        if (!textoLimpio(nombre)) {
+            return res.status(400).json({ error: 'El nombre es obligatorio.' });
+        }
         const result = await db.query(
-            `INSERT INTO banco_vacunas (veterinaria_id, nombre, especie, enfermedades, laboratorio, lote, frecuencia, observaciones)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-            [req.veterinaria.id, nombre.trim(), especie || 'Ambos', enfermedades, laboratorio, lote, frecuencia, observaciones]
+            `INSERT INTO banco_vacunas (veterinaria_id, nombre, tipo, especie, enfermedades, laboratorio, lote, frecuencia, observaciones)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [req.veterinaria.id, textoLimpio(nombre), textoLimpio(tipo), especie || 'Ambos', enfermedades, laboratorio, lote, frecuencia, observaciones]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -1489,13 +1574,16 @@ app.post('/api/banco/vacunas', authMiddleware, async (req, res) => {
 
 app.put('/api/banco/vacunas/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { nombre, especie, enfermedades, laboratorio, lote, frecuencia, observaciones } = req.body;
+    const { nombre, tipo, especie, enfermedades, laboratorio, lote, frecuencia, observaciones } = req.body;
     try {
+        if (!textoLimpio(nombre)) {
+            return res.status(400).json({ error: 'El nombre es obligatorio.' });
+        }
         const result = await db.query(
             `UPDATE banco_vacunas 
-             SET nombre = $1, especie = $2, enfermedades = $3, laboratorio = $4, lote = $5, frecuencia = $6, observaciones = $7
-             WHERE id = $8 AND veterinaria_id = $9 RETURNING *`,
-            [nombre.trim(), especie || 'Ambos', enfermedades, laboratorio, lote, frecuencia, observaciones, id, req.veterinaria.id]
+             SET nombre = $1, tipo = $2, especie = $3, enfermedades = $4, laboratorio = $5, lote = $6, frecuencia = $7, observaciones = $8
+             WHERE id = $9 AND veterinaria_id = $10 RETURNING *`,
+            [textoLimpio(nombre), textoLimpio(tipo), especie || 'Ambos', enfermedades, laboratorio, lote, frecuencia, observaciones, id, req.veterinaria.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Item no encontrado' });
         res.json(result.rows[0]);
@@ -1528,12 +1616,15 @@ app.get('/api/banco/internos', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/banco/internos', authMiddleware, async (req, res) => {
-    const { nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones } = req.body;
+    const datos = payloadBancoInterno(req.body);
     try {
+        if (!datos.nombre) {
+            return res.status(400).json({ error: 'El nombre es obligatorio.' });
+        }
         const result = await db.query(
-            `INSERT INTO banco_internos (veterinaria_id, nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [req.veterinaria.id, nombre.trim(), especie || 'Ambos', tipo, rango_peso, parasitos, dosis, via, observaciones]
+            `INSERT INTO banco_internos (veterinaria_id, nombre, principio_activo, especie, tipo, rango_peso, parasitos, dosis, via, frecuencia, laboratorio, lote, observaciones)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+            [req.veterinaria.id, datos.nombre, datos.principioActivo, datos.especie, datos.tipo, datos.rangoPeso, datos.parasitos, datos.dosis, datos.via, datos.frecuencia, datos.laboratorio, datos.lote, datos.observaciones]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -1544,13 +1635,16 @@ app.post('/api/banco/internos', authMiddleware, async (req, res) => {
 
 app.put('/api/banco/internos/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones } = req.body;
+    const datos = payloadBancoInterno(req.body);
     try {
+        if (!datos.nombre) {
+            return res.status(400).json({ error: 'El nombre es obligatorio.' });
+        }
         const result = await db.query(
             `UPDATE banco_internos 
-             SET nombre = $1, especie = $2, tipo = $3, rango_peso = $4, parasitos = $5, dosis = $6, via = $7, observaciones = $8
-             WHERE id = $9 AND veterinaria_id = $10 RETURNING *`,
-            [nombre.trim(), especie || 'Ambos', tipo, rango_peso, parasitos, dosis, via, observaciones, id, req.veterinaria.id]
+             SET nombre = $1, principio_activo = $2, especie = $3, tipo = $4, rango_peso = $5, parasitos = $6, dosis = $7, via = $8, frecuencia = $9, laboratorio = $10, lote = $11, observaciones = $12
+             WHERE id = $13 AND veterinaria_id = $14 RETURNING *`,
+            [datos.nombre, datos.principioActivo, datos.especie, datos.tipo, datos.rangoPeso, datos.parasitos, datos.dosis, datos.via, datos.frecuencia, datos.laboratorio, datos.lote, datos.observaciones, id, req.veterinaria.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Item no encontrado' });
         res.json(result.rows[0]);
@@ -1583,12 +1677,15 @@ app.get('/api/banco/externos', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/banco/externos', authMiddleware, async (req, res) => {
-    const { nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones } = req.body;
+    const datos = payloadBancoExterno(req.body);
     try {
+        if (!datos.nombre) {
+            return res.status(400).json({ error: 'El nombre es obligatorio.' });
+        }
         const result = await db.query(
-            `INSERT INTO banco_externos (veterinaria_id, nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [req.veterinaria.id, nombre.trim(), especie || 'Ambos', tipo, rango_peso, parasitos, dosis, via, observaciones]
+            `INSERT INTO banco_externos (veterinaria_id, nombre, principio_activo, especie, tipo, rango_peso, duracion, parasitos, dosis, via, frecuencia, laboratorio, lote, observaciones, advertencias)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+            [req.veterinaria.id, datos.nombre, datos.principioActivo, datos.especie, datos.tipo, datos.rangoPeso, datos.duracion, datos.parasitos, datos.dosis, datos.via, datos.frecuencia, datos.laboratorio, datos.lote, datos.observaciones, datos.advertencias]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -1599,13 +1696,16 @@ app.post('/api/banco/externos', authMiddleware, async (req, res) => {
 
 app.put('/api/banco/externos/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { nombre, especie, tipo, rango_peso, parasitos, dosis, via, observaciones } = req.body;
+    const datos = payloadBancoExterno(req.body);
     try {
+        if (!datos.nombre) {
+            return res.status(400).json({ error: 'El nombre es obligatorio.' });
+        }
         const result = await db.query(
             `UPDATE banco_externos 
-             SET nombre = $1, especie = $2, tipo = $3, rango_peso = $4, parasitos = $5, dosis = $6, via = $7, observaciones = $8
-             WHERE id = $9 AND veterinaria_id = $10 RETURNING *`,
-            [nombre.trim(), especie || 'Ambos', tipo, rango_peso, parasitos, dosis, via, observaciones, id, req.veterinaria.id]
+             SET nombre = $1, principio_activo = $2, especie = $3, tipo = $4, rango_peso = $5, duracion = $6, parasitos = $7, dosis = $8, via = $9, frecuencia = $10, laboratorio = $11, lote = $12, observaciones = $13, advertencias = $14
+             WHERE id = $15 AND veterinaria_id = $16 RETURNING *`,
+            [datos.nombre, datos.principioActivo, datos.especie, datos.tipo, datos.rangoPeso, datos.duracion, datos.parasitos, datos.dosis, datos.via, datos.frecuencia, datos.laboratorio, datos.lote, datos.observaciones, datos.advertencias, id, req.veterinaria.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Item no encontrado' });
         res.json(result.rows[0]);
