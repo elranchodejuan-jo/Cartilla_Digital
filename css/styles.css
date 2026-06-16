@@ -597,6 +597,78 @@ textarea.form-control {
     min-height: 90px;
 }
 
+.combo-field {
+    position: relative;
+}
+
+.combo-input {
+    width: 100%;
+    padding-right: 44px;
+}
+
+.combo-toggle {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 42px;
+    height: calc(100% - 2px);
+    border: 0;
+    border-left: 1px solid var(--border-gray);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.combo-list {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border-gray);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-large);
+    padding: 6px;
+}
+
+.combo-list[hidden] {
+    display: none;
+}
+
+.combo-option {
+    width: 100%;
+    min-height: 40px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-main);
+    cursor: pointer;
+    font: inherit;
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.combo-option:hover,
+.combo-option.active {
+    background: var(--primary-focus);
+    color: var(--primary);
+}
+
+.combo-option:disabled {
+    cursor: default;
+    color: var(--text-muted);
+}
+
+.combo-option-manual {
+    font-weight: 700;
+}
+
 .form-actions {
     margin-top: 32px;
     display: flex;
@@ -1795,4 +1867,3 @@ body.public-view #theme-toggle {
 body.public-view .no-public {
     display: none !important;
 }
-

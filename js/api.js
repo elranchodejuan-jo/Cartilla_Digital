@@ -243,6 +243,24 @@ const API = {
         return this.handleResponse(res);
     },
 
+    async obtenerRazas(especie = '') {
+        const query = especie ? `?especie=${encodeURIComponent(especie)}` : '';
+        const res = await fetch(`${API_BASE_URL}/razas${query}`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async guardarRaza(datos) {
+        const res = await fetch(`${API_BASE_URL}/razas`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
     // --- HISTORIAL CLÍNICO: VACUNAS ---
     async guardarVacuna(mascotaId, datos) {
         const res = await fetch(`${API_BASE_URL}/mascotas/${mascotaId}/vacunas`, {

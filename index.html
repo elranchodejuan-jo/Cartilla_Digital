@@ -443,8 +443,11 @@
                         </div>
                         <div class="form-group">
                             <label for="pet-raza">Raza</label>
-                            <input type="text" id="pet-raza" class="form-control" placeholder="Ej. Golden Retriever / Mestizo" list="datalist-razas">
-                            <datalist id="datalist-razas"></datalist>
+                            <div class="combo-field" id="pet-raza-combo">
+                                <input type="text" id="pet-raza" class="form-control combo-input" placeholder="Seleccione o escriba una raza" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="pet-raza-options" aria-autocomplete="list">
+                                <button type="button" class="combo-toggle" id="pet-raza-toggle" aria-label="Mostrar razas">⌄</button>
+                                <div class="combo-list" id="pet-raza-options" role="listbox"></div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="pet-sexo">Sexo</label>

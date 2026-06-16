@@ -30,6 +30,26 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+function normalizarEspecieRaza(especie) {
+    const valor = (especie || '').toLowerCase().trim();
+    if (valor === 'perro' || valor === 'canino' || valor === 'p') return 'Canino';
+    if (valor === 'gato' || valor === 'felino' || valor === 'g') return 'Felino';
+    return '';
+}
+
+function normalizarNombreRaza(nombre) {
+    return (nombre || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, ' ');
+}
+
+function formatearNombreRaza(nombre) {
+    return (nombre || '').trim().replace(/\s+/g, ' ');
+}
+
 // --- RUTAS DE AUTENTICACIÓN ---
 
 /**
@@ -299,6 +319,64 @@ app.put('/api/veterinaria', authMiddleware, async (req, res) => {
 
 
 // --- RUTAS DE MASCOTAS ---
+
+/**
+ * Obtener razas personalizadas de la veterinaria autenticada
+ */
+app.get('/api/razas', authMiddleware, async (req, res) => {
+    try {
+        const especie = normalizarEspecieRaza(req.query.especie);
+        const params = [req.veterinaria.id];
+        let where = 'WHERE veterinaria_id = $1';
+
+        if (especie) {
+            params.push(especie);
+            where += ' AND especie = $2';
+        }
+
+        const result = await db.query(
+            `SELECT id, especie, nombre
+             FROM razas_clinica
+             ${where}
+             ORDER BY especie ASC, nombre ASC`,
+            params
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al obtener razas personalizadas.' });
+    }
+});
+
+/**
+ * Guardar una raza nueva de la veterinaria autenticada
+ */
+app.post('/api/razas', authMiddleware, async (req, res) => {
+    const especie = normalizarEspecieRaza(req.body.especie);
+    const nombre = formatearNombreRaza(req.body.nombre);
+    const nombreNormalizado = normalizarNombreRaza(nombre);
+
+    if (!especie || !nombre) {
+        return res.status(400).json({ error: 'Especie y raza son obligatorias.' });
+    }
+
+    try {
+        const result = await db.query(
+            `INSERT INTO razas_clinica (veterinaria_id, especie, nombre, nombre_normalizado)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (veterinaria_id, especie, nombre_normalizado)
+             DO UPDATE SET nombre = EXCLUDED.nombre
+             RETURNING id, especie, nombre`,
+            [req.veterinaria.id, especie, nombre, nombreNormalizado]
+        );
+
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Error al guardar la raza personalizada.' });
+    }
+});
 
 /**
  * Obtener listado de mascotas de la veterinaria autenticada

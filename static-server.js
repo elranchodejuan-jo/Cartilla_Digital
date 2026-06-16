@@ -18,7 +18,12 @@ const MIME_TYPES = {
 };
 
 function responder(res, status, body, type = 'text/plain; charset=utf-8') {
-    res.writeHead(status, { 'Content-Type': type });
+    res.writeHead(status, {
+        'Content-Type': type,
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+    });
     res.end(body);
 }
 

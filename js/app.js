@@ -287,6 +287,7 @@ function configurarManejadoresFormularios() {
                     mostrarToast('Actualizando paciente...', 'info');
                     const exito = await editarMascota(UIState.mascotaEdicionId, datosMascota);
                     if (exito) {
+                        await guardarRazaClinicaSiEsNueva(especie, raza);
                         formularioModificado = false;
                         UIState.mascotaEdicionId = null; // Limpiar el estado de edición
                         mostrarToast('Paciente actualizado correctamente.', 'success');
@@ -298,6 +299,7 @@ function configurarManejadoresFormularios() {
                     mostrarToast('Registrando paciente...', 'info');
                     const mascotaNueva = await registrarMascota(datosMascota);
                     if (mascotaNueva) {
+                        await guardarRazaClinicaSiEsNueva(especie, raza);
                         formularioModificado = false;
                         mostrarToast(`Mascota registrada: ${mascotaNueva.codigo}`, 'success');
                         navegarA('pacientes');

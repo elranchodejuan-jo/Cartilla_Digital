@@ -43,6 +43,19 @@ CREATE TABLE IF NOT EXISTS mascotas (
 CREATE INDEX IF NOT EXISTS idx_mascotas_veterinaria ON mascotas(veterinaria_id);
 CREATE INDEX IF NOT EXISTS idx_mascotas_codigo ON mascotas(codigo);
 
+-- 3. TABLA: RAZAS PERSONALIZADAS POR CLINICA
+CREATE TABLE IF NOT EXISTS razas_clinica (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    veterinaria_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+    especie VARCHAR(50) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    nombre_normalizado VARCHAR(100) NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (veterinaria_id, especie, nombre_normalizado)
+);
+
+CREATE INDEX IF NOT EXISTS idx_razas_clinica_veterinaria ON razas_clinica(veterinaria_id);
+
 -- 3. TABLA: EQUIPO VETERINARIO
 CREATE TABLE IF NOT EXISTS equipo_veterinario (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

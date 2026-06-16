@@ -199,7 +199,7 @@ async function navegarA(seccionId) {
     } else if (seccionId === 'configuracion') {
         cargarDatosFormVeterinaria();
     } else if (seccionId === 'registrarMascota') {
-        prepararFormularioMascota();
+        await prepararFormularioMascota();
     } else if (seccionId === 'banco') {
         cambiarPestañaBanco(bancoPestañaActiva);
     }
@@ -344,7 +344,7 @@ function cargarDatosFormVeterinaria() {
 /**
  * Resetea y prepara el formulario de mascotas.
  */
-function prepararFormularioMascota() {
+async function prepararFormularioMascota() {
     DOM.formMascota.reset();
     UIState.mascotaEdicionId = null;
     UIState.fotoMascotaBase64 = '';
@@ -363,19 +363,7 @@ function prepararFormularioMascota() {
         btnEliminar.style.display = 'none';
     }
     
-    // Inicializar datalist de razas
-    const especieSelect = document.getElementById('pet-especie');
-    const datalistRazas = document.getElementById('datalist-razas');
-    if (especieSelect && datalistRazas) {
-        actualizarDatalistRazas(especieSelect.value, datalistRazas);
-        
-        if (!especieSelect.dataset.hasChangeListener) {
-            especieSelect.addEventListener('change', (e) => {
-                actualizarDatalistRazas(e.target.value, datalistRazas);
-            });
-            especieSelect.dataset.hasChangeListener = 'true';
-        }
-    }
+    await inicializarSelectorRazaMascota();
     
     const title = DOM.secciones.registrarMascota.querySelector('.form-title');
     if (title) title.textContent = "Registrar Nueva Mascota";
@@ -716,7 +704,7 @@ async function prepararEdicionMascota(id) {
     const mascota = mascotas.find(m => m.id === id);
     if (!mascota) return;
     
-    navegarA('registrarMascota');
+    await navegarA('registrarMascota');
     
     const title = DOM.secciones.registrarMascota.querySelector('.form-title');
     if (title) title.textContent = `Editar Mascota: ${mascota.nombre}`;
@@ -725,7 +713,7 @@ async function prepararEdicionMascota(id) {
     
     document.getElementById('pet-nombre').value = mascota.nombre;
     document.getElementById('pet-especie').value = mascota.especie;
-    document.getElementById('pet-raza').value = mascota.raza || '';
+    await inicializarSelectorRazaMascota(mascota.especie, mascota.raza || '');
     document.getElementById('pet-sexo').value = mascota.sexo;
     document.getElementById('pet-nacimiento').value = mascota.fechaNacimiento;
     document.getElementById('pet-color').value = mascota.color || '';
@@ -752,11 +740,6 @@ async function prepararEdicionMascota(id) {
         }
         if (placeholder) placeholder.style.display = 'block';
         if (btnEliminar) btnEliminar.style.display = 'none';
-    }
-    
-    const datalistRazas = document.getElementById('datalist-razas');
-    if (datalistRazas) {
-        actualizarDatalistRazas(mascota.especie, datalistRazas);
     }
 }
 

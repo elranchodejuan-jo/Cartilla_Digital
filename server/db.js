@@ -111,6 +111,16 @@ const migrarBaseDatos = async () => {
                 fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS razas_clinica (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                veterinaria_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+                especie VARCHAR(50) NOT NULL,
+                nombre VARCHAR(100) NOT NULL,
+                nombre_normalizado VARCHAR(100) NOT NULL,
+                fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (veterinaria_id, especie, nombre_normalizado)
+            );
+
             ALTER TABLE banco_vacunas
                 ADD COLUMN IF NOT EXISTS tipo VARCHAR(80);
 
@@ -129,6 +139,7 @@ const migrarBaseDatos = async () => {
                 ADD COLUMN IF NOT EXISTS advertencias TEXT;
 
             CREATE INDEX IF NOT EXISTS idx_equipo_veterinaria ON equipo_veterinario(veterinaria_id);
+            CREATE INDEX IF NOT EXISTS idx_razas_clinica_veterinaria ON razas_clinica(veterinaria_id);
         `);
         console.log('Migración de base de datos verificada y al día.');
     } catch (e) {
