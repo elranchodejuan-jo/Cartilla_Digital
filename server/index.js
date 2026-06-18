@@ -534,6 +534,32 @@ function formatearFechaAAMMDD(date) {
     return `${y}${m}${d}`;
 }
 
+async function generarCodigoPacienteParaClinica(queryable, clinica, especie) {
+    const hoy = new Date();
+    let especieCodigo = 'O';
+    const espLower = (especie || '').toLowerCase().trim();
+    if (espLower === 'perro' || espLower === 'canino') especieCodigo = 'C';
+    else if (espLower === 'gato' || espLower === 'felino') especieCodigo = 'F';
+
+    const iniciales = (clinica.iniciales || 'CD').toUpperCase();
+    const fechaCodigo = formatearFechaAAMMDD(hoy);
+    const codigoPrefix = `CD-${iniciales}-${especieCodigo}-${fechaCodigo}-`;
+    const codigosRes = await queryable.query(
+        `SELECT codigo
+         FROM mascotas
+         WHERE veterinaria_id = $1
+           AND codigo LIKE $2
+         ORDER BY codigo DESC`,
+        [clinica.id, `${codigoPrefix}%`]
+    );
+    const mayorCorrelativo = codigosRes.rows.reduce((max, row) => {
+        const match = String(row.codigo || '').match(/-(\d+)$/);
+        const numero = match ? parseInt(match[1], 10) : 0;
+        return Number.isFinite(numero) && numero > max ? numero : max;
+    }, 0);
+    return `${codigoPrefix}${String(mayorCorrelativo + 1).padStart(3, '0')}`;
+}
+
 /**
  * Registrar mascota (paciente)
  */
@@ -1274,6 +1300,797 @@ app.delete('/api/mascotas/:id/controles/:controlId', authMiddleware, async (req,
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Error al eliminar control.' });
+    }
+});
+
+// --- TRANSFERENCIA AVANZADA DE PACIENTES ENTRE CLINICAS ---
+
+function mapearClinicaPublica(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        nombre: row.nombre,
+        propietario: row.propietario || '',
+        iniciales: row.iniciales || '',
+        telefono: row.telefono || '',
+        email: row.email || '',
+        direccion: row.direccion || '',
+        ciudad: row.ciudad || row.direccion || '',
+        logo: row.logo_base64 || row.logo || '',
+        fechaRegistro: row.fecha_registro
+    };
+}
+
+function mapearPermisosTransferencia(permisos = {}) {
+    const full = !!permisos.includeFullHistory;
+    return {
+        includePetData: permisos.includePetData !== false,
+        includeTutorData: permisos.includeTutorData !== false,
+        includeVaccines: full || !!permisos.includeVaccines,
+        includeInternalDeworming: full || !!permisos.includeInternalDeworming,
+        includeExternalDeworming: full || !!permisos.includeExternalDeworming,
+        includePreventiveHistory: full || !!permisos.includePreventiveHistory,
+        includeNextAppointments: full || !!permisos.includeNextAppointments,
+        includeObservations: full || !!permisos.includeObservations,
+        includePhotos: full || !!permisos.includePhotos,
+        includeFullHistory: full
+    };
+}
+
+function fechaISO(valor) {
+    if (!valor) return null;
+    return valor instanceof Date ? valor.toISOString() : valor;
+}
+
+async function registrarAuditoria(queryable, { transferId = null, associationId = null, action, actorClinicId, details = {} }) {
+    await queryable.query(
+        `INSERT INTO transfer_audit_logs (transfer_request_id, association_id, action, actor_user_id, actor_clinic_id, details)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+        [transferId, associationId, action, actorClinicId, actorClinicId, JSON.stringify(details)]
+    );
+}
+
+async function crearNotificacion(queryable, { veterinariaId, type, title, message, transferId = null, associationId = null }) {
+    await queryable.query(
+        `INSERT INTO internal_notifications (veterinaria_id, type, title, message, related_transfer_id, related_association_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [veterinariaId, type, title, message || '', transferId, associationId]
+    );
+}
+
+async function obtenerAsociacionAceptada(queryable, clinicaA, clinicaB) {
+    const result = await queryable.query(
+        `SELECT *
+         FROM clinic_associations
+         WHERE status = 'accepted'
+           AND (
+             (requester_clinic_id = $1 AND receiver_clinic_id = $2)
+             OR (requester_clinic_id = $2 AND receiver_clinic_id = $1)
+           )
+         LIMIT 1`,
+        [clinicaA, clinicaB]
+    );
+    return result.rows[0] || null;
+}
+
+async function cargarTransferenciaCompleta(queryable, transferId, clinicaId) {
+    const transferenciaRes = await queryable.query(
+        `SELECT ptr.*,
+                ov.nombre AS origin_name, ov.propietario AS origin_owner, ov.iniciales AS origin_initials, ov.telefono AS origin_phone, ov.email AS origin_email, ov.direccion AS origin_city, ov.logo_base64 AS origin_logo,
+                dv.nombre AS destination_name, dv.propietario AS destination_owner, dv.iniciales AS destination_initials, dv.telefono AS destination_phone, dv.email AS destination_email, dv.direccion AS destination_city, dv.logo_base64 AS destination_logo,
+                rv.nombre AS requester_name, rv.propietario AS requester_owner, rv.iniciales AS requester_initials, rv.telefono AS requester_phone, rv.email AS requester_email, rv.direccion AS requester_city, rv.logo_base64 AS requester_logo,
+                cv.nombre AS receiver_name, cv.propietario AS receiver_owner, cv.iniciales AS receiver_initials, cv.telefono AS receiver_phone, cv.email AS receiver_email, cv.direccion AS receiver_city, cv.logo_base64 AS receiver_logo
+         FROM patient_transfer_requests ptr
+         LEFT JOIN veterinarias ov ON ov.id = ptr.origin_clinic_id
+         LEFT JOIN veterinarias dv ON dv.id = ptr.destination_clinic_id
+         LEFT JOIN veterinarias rv ON rv.id = ptr.requester_clinic_id
+         LEFT JOIN veterinarias cv ON cv.id = ptr.receiver_clinic_id
+         WHERE ptr.id = $1
+           AND $2 IN (ptr.origin_clinic_id, ptr.destination_clinic_id, ptr.requester_clinic_id, ptr.receiver_clinic_id)`,
+        [transferId, clinicaId]
+    );
+    if (transferenciaRes.rows.length === 0) return null;
+
+    const row = transferenciaRes.rows[0];
+    const itemsRes = await queryable.query(
+        `SELECT * FROM patient_transfer_items WHERE transfer_request_id = $1 ORDER BY created_at ASC`,
+        [transferId]
+    );
+    const permisosRes = await queryable.query(
+        `SELECT * FROM patient_transfer_permissions WHERE transfer_request_id = $1`,
+        [transferId]
+    );
+    const searchRes = await queryable.query(
+        `SELECT * FROM patient_request_search_data WHERE transfer_request_id = $1 LIMIT 1`,
+        [transferId]
+    );
+
+    return {
+        id: row.id,
+        requestType: row.request_type,
+        transferType: row.transfer_type,
+        status: row.status,
+        reason: row.reason || '',
+        rejectionReason: row.rejection_reason || '',
+        requestedAt: fechaISO(row.requested_at),
+        respondedAt: fechaISO(row.responded_at),
+        completedAt: fechaISO(row.completed_at),
+        originClinicId: row.origin_clinic_id,
+        destinationClinicId: row.destination_clinic_id,
+        requesterClinicId: row.requester_clinic_id,
+        receiverClinicId: row.receiver_clinic_id,
+        originClinic: mapearClinicaPublica({ id: row.origin_clinic_id, nombre: row.origin_name, propietario: row.origin_owner, iniciales: row.origin_initials, telefono: row.origin_phone, email: row.origin_email, direccion: row.origin_city, logo_base64: row.origin_logo }),
+        destinationClinic: mapearClinicaPublica({ id: row.destination_clinic_id, nombre: row.destination_name, propietario: row.destination_owner, iniciales: row.destination_initials, telefono: row.destination_phone, email: row.destination_email, direccion: row.destination_city, logo_base64: row.destination_logo }),
+        requesterClinic: mapearClinicaPublica({ id: row.requester_clinic_id, nombre: row.requester_name, propietario: row.requester_owner, iniciales: row.requester_initials, telefono: row.requester_phone, email: row.requester_email, direccion: row.requester_city, logo_base64: row.requester_logo }),
+        receiverClinic: mapearClinicaPublica({ id: row.receiver_clinic_id, nombre: row.receiver_name, propietario: row.receiver_owner, iniciales: row.receiver_initials, telefono: row.receiver_phone, email: row.receiver_email, direccion: row.receiver_city, logo_base64: row.receiver_logo }),
+        items: itemsRes.rows.map(item => ({
+            id: item.id,
+            sourcePatientId: item.source_patient_id,
+            copiedPatientId: item.copied_patient_id,
+            patientName: item.patient_name_snapshot || '',
+            patientCode: item.patient_code_snapshot || '',
+            tutorName: item.tutor_name_snapshot || '',
+            species: item.species_snapshot || '',
+            status: item.status || 'pending'
+        })),
+        permissions: permisosRes.rows[0] ? {
+            includePetData: permisosRes.rows[0].include_pet_data,
+            includeTutorData: permisosRes.rows[0].include_tutor_data,
+            includeVaccines: permisosRes.rows[0].include_vaccines,
+            includeInternalDeworming: permisosRes.rows[0].include_internal_deworming,
+            includeExternalDeworming: permisosRes.rows[0].include_external_deworming,
+            includePreventiveHistory: permisosRes.rows[0].include_preventive_history,
+            includeNextAppointments: permisosRes.rows[0].include_next_appointments,
+            includeObservations: permisosRes.rows[0].include_observations,
+            includePhotos: permisosRes.rows[0].include_photos,
+            includeFullHistory: permisosRes.rows[0].include_full_history
+        } : mapearPermisosTransferencia({}),
+        searchData: searchRes.rows[0] ? {
+            patientName: searchRes.rows[0].patient_name || '',
+            patientCode: searchRes.rows[0].patient_code || '',
+            tutorName: searchRes.rows[0].tutor_name || '',
+            tutorPhone: searchRes.rows[0].tutor_phone || '',
+            tutorEmail: searchRes.rows[0].tutor_email || '',
+            species: searchRes.rows[0].species || '',
+            breed: searchRes.rows[0].breed || '',
+            notes: searchRes.rows[0].notes || ''
+        } : null
+    };
+}
+
+async function copiarPacienteAutorizado(client, sourcePatientId, destinationClinicId, transferId, permissions) {
+    const existente = await client.query(
+        `SELECT id FROM mascotas WHERE transfer_request_id = $1 AND source_mascota_id = $2 AND veterinaria_id = $3 LIMIT 1`,
+        [transferId, sourcePatientId, destinationClinicId]
+    );
+    if (existente.rows.length > 0) return existente.rows[0].id;
+
+    const mascotaRes = await client.query('SELECT * FROM mascotas WHERE id = $1', [sourcePatientId]);
+    if (mascotaRes.rows.length === 0) {
+        throw new Error('Paciente origen no encontrado.');
+    }
+    const origen = mascotaRes.rows[0];
+    const destinoRes = await client.query('SELECT id, iniciales FROM veterinarias WHERE id = $1', [destinationClinicId]);
+    if (destinoRes.rows.length === 0) {
+        throw new Error('Clinica destino no encontrada.');
+    }
+
+    const destino = destinoRes.rows[0];
+    const codigo = await generarCodigoPacienteParaClinica(client, destino, origen.especie);
+    const includeTutor = permissions.includeTutorData || permissions.includeFullHistory;
+    const includeObs = permissions.includeObservations || permissions.includeFullHistory;
+    const includePhotos = permissions.includePhotos || permissions.includeFullHistory;
+
+    const insertRes = await client.query(
+        `INSERT INTO mascotas (
+            codigo, veterinaria_iniciales, veterinaria_id, nombre, especie, raza, sexo,
+            fecha_nacimiento, color, peso, foto_base64, tutor_nombre, tutor_telefono,
+            tutor_direccion, observaciones, source_veterinaria_id, source_mascota_id,
+            received_by_transfer, transfer_request_id, transfer_status
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, TRUE, $18, 'received')
+         RETURNING id`,
+        [
+            codigo,
+            destino.iniciales,
+            destinationClinicId,
+            origen.nombre,
+            origen.especie,
+            origen.raza || '',
+            origen.sexo,
+            origen.fecha_nacimiento,
+            origen.color || '',
+            origen.peso,
+            includePhotos ? (origen.foto_base64 || '') : '',
+            includeTutor ? origen.tutor_nombre : 'Dato reservado',
+            includeTutor ? (origen.tutor_telefono || '') : '',
+            includeTutor ? (origen.tutor_direccion || '') : '',
+            includeObs ? (origen.observaciones || '') : '',
+            origen.veterinaria_id,
+            origen.id,
+            transferId
+        ]
+    );
+
+    const nuevoId = insertRes.rows[0].id;
+    if (permissions.includeVaccines || permissions.includeFullHistory) {
+        await client.query(
+            `INSERT INTO vacunas (mascota_id, nombre, enfermedades, laboratorio, fecha_aplicacion, proxima_dosis, lote, responsable, responsable_id, observaciones, status, fecha_asistencia)
+             SELECT $1, nombre, enfermedades, laboratorio, fecha_aplicacion, proxima_dosis, lote, responsable, NULL, observaciones, status, fecha_asistencia
+             FROM vacunas WHERE mascota_id = $2`,
+            [nuevoId, sourcePatientId]
+        );
+    }
+    if (permissions.includeInternalDeworming || permissions.includeFullHistory) {
+        await client.query(
+            `INSERT INTO desparasitaciones (mascota_id, tipo, producto, tipo_producto, rango_peso, parasitos_cubre, fecha_aplicacion, proxima_aplicacion, dosis, via, responsable, responsable_id, observaciones, status, fecha_asistencia)
+             SELECT $1, tipo, producto, tipo_producto, rango_peso, parasitos_cubre, fecha_aplicacion, proxima_aplicacion, dosis, via, responsable, NULL, observaciones, status, fecha_asistencia
+             FROM desparasitaciones WHERE mascota_id = $2 AND COALESCE(tipo, 'interna') = 'interna'`,
+            [nuevoId, sourcePatientId]
+        );
+    }
+    if (permissions.includeExternalDeworming || permissions.includeFullHistory) {
+        await client.query(
+            `INSERT INTO desparasitaciones (mascota_id, tipo, producto, tipo_producto, rango_peso, parasitos_cubre, fecha_aplicacion, proxima_aplicacion, dosis, via, responsable, responsable_id, observaciones, status, fecha_asistencia)
+             SELECT $1, tipo, producto, tipo_producto, rango_peso, parasitos_cubre, fecha_aplicacion, proxima_aplicacion, dosis, via, responsable, NULL, observaciones, status, fecha_asistencia
+             FROM desparasitaciones WHERE mascota_id = $2 AND COALESCE(tipo, 'interna') <> 'interna'`,
+            [nuevoId, sourcePatientId]
+        );
+    }
+    if (permissions.includePreventiveHistory || permissions.includeFullHistory) {
+        await client.query(
+            `INSERT INTO controles (mascota_id, fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximo_control, responsable, responsable_id, status, fecha_asistencia)
+             SELECT $1, fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximo_control, responsable, NULL, status, fecha_asistencia
+             FROM controles WHERE mascota_id = $2`,
+            [nuevoId, sourcePatientId]
+        );
+    }
+
+    await client.query(
+        `UPDATE patient_transfer_items
+         SET copied_patient_id = $1, status = 'completed', updated_at = CURRENT_TIMESTAMP
+         WHERE transfer_request_id = $2 AND source_patient_id = $3`,
+        [nuevoId, transferId, sourcePatientId]
+    );
+    return nuevoId;
+}
+
+app.get('/api/transferencias/dashboard', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    try {
+        const pending = await db.query(
+            `SELECT COUNT(*)::int AS total
+             FROM (
+                SELECT id FROM patient_transfer_requests WHERE status = 'pending' AND $1 IN (destination_clinic_id, receiver_clinic_id)
+                UNION ALL
+                SELECT id FROM clinic_associations WHERE status = 'pending' AND receiver_clinic_id = $1
+             ) p`,
+            [clinicId]
+        );
+        const enviados = await db.query(`SELECT COUNT(*)::int AS total FROM patient_transfer_requests WHERE request_type = 'send_patient' AND origin_clinic_id = $1`, [clinicId]);
+        const recibidos = await db.query(`SELECT COUNT(*)::int AS total FROM patient_transfer_requests WHERE request_type = 'send_patient' AND destination_clinic_id = $1 AND status IN ('accepted', 'completed')`, [clinicId]);
+        const solicitudes = await db.query(`SELECT COUNT(*)::int AS total FROM patient_transfer_requests WHERE request_type = 'request_patient' AND $1 IN (requester_clinic_id, receiver_clinic_id)`, [clinicId]);
+        const asociadas = await db.query(`SELECT COUNT(*)::int AS total FROM clinic_associations WHERE status = 'accepted' AND $1 IN (requester_clinic_id, receiver_clinic_id)`, [clinicId]);
+        res.json({
+            solicitudesPendientes: pending.rows[0].total,
+            pacientesEnviados: enviados.rows[0].total,
+            pacientesRecibidos: recibidos.rows[0].total,
+            solicitudesPacientes: solicitudes.rows[0].total,
+            clinicasAsociadas: asociadas.rows[0].total
+        });
+    } catch (err) {
+        console.error('Error dashboard transferencias:', err);
+        res.status(500).json({ error: 'Error al obtener resumen de transferencias.' });
+    }
+});
+
+app.get('/api/transferencias/clinicas', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    const q = textoLimpio(req.query.q).toLowerCase();
+    try {
+        const params = [clinicId];
+        let filtro = '';
+        if (q) {
+            params.push(`%${q}%`);
+            filtro = `AND (
+                LOWER(v.nombre) LIKE $2 OR LOWER(v.iniciales) LIKE $2 OR LOWER(COALESCE(v.email, '')) LIKE $2
+                OR LOWER(COALESCE(v.telefono, '')) LIKE $2 OR LOWER(COALESCE(v.propietario, '')) LIKE $2
+                OR LOWER(COALESCE(v.direccion, '')) LIKE $2
+            )`;
+        }
+        const result = await db.query(
+            `SELECT v.id, v.nombre, v.propietario, v.iniciales, v.telefono, v.email, v.direccion, v.logo_base64,
+                    ca.id AS association_id, ca.status AS association_status,
+                    ca.requester_clinic_id, ca.receiver_clinic_id
+             FROM veterinarias v
+             LEFT JOIN clinic_associations ca
+               ON (
+                    (ca.requester_clinic_id = $1 AND ca.receiver_clinic_id = v.id)
+                    OR (ca.receiver_clinic_id = $1 AND ca.requester_clinic_id = v.id)
+                  )
+              AND ca.status <> 'cancelled'
+             WHERE v.id <> $1 ${filtro}
+             ORDER BY v.nombre ASC
+             LIMIT 50`,
+            params
+        );
+        res.json(result.rows.map(row => ({
+            ...mapearClinicaPublica(row),
+            associationId: row.association_id || null,
+            relationshipStatus: row.association_status || 'none',
+            isRequester: row.requester_clinic_id === clinicId,
+            isReceiver: row.receiver_clinic_id === clinicId
+        })));
+    } catch (err) {
+        console.error('Error buscando clinicas:', err);
+        res.status(500).json({ error: 'Error al buscar clinicas registradas.' });
+    }
+});
+
+app.get('/api/transferencias/asociaciones', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    const status = textoLimpio(req.query.status);
+    try {
+        const params = [clinicId];
+        let filtro = '';
+        if (status) {
+            params.push(status);
+            filtro = 'AND ca.status = $2';
+        }
+        const result = await db.query(
+            `SELECT ca.*, v.id AS other_id, v.nombre, v.propietario, v.iniciales, v.telefono, v.email, v.direccion, v.logo_base64
+             FROM clinic_associations ca
+             JOIN veterinarias v ON v.id = CASE WHEN ca.requester_clinic_id = $1 THEN ca.receiver_clinic_id ELSE ca.requester_clinic_id END
+             WHERE $1 IN (ca.requester_clinic_id, ca.receiver_clinic_id) ${filtro}
+             ORDER BY ca.updated_at DESC, ca.requested_at DESC`,
+            params
+        );
+        res.json(result.rows.map(row => ({
+            id: row.id,
+            status: row.status,
+            message: row.message || '',
+            requestedAt: fechaISO(row.requested_at),
+            respondedAt: fechaISO(row.responded_at),
+            isRequester: row.requester_clinic_id === clinicId,
+            isReceiver: row.receiver_clinic_id === clinicId,
+            clinic: mapearClinicaPublica({
+                id: row.other_id,
+                nombre: row.nombre,
+                propietario: row.propietario,
+                iniciales: row.iniciales,
+                telefono: row.telefono,
+                email: row.email,
+                direccion: row.direccion,
+                logo_base64: row.logo_base64
+            })
+        })));
+    } catch (err) {
+        console.error('Error listando asociaciones:', err);
+        res.status(500).json({ error: 'Error al cargar clinicas asociadas.' });
+    }
+});
+
+app.post('/api/transferencias/asociaciones', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    const receiverClinicId = req.body.receiverClinicId;
+    const message = textoLimpio(req.body.message);
+    if (!receiverClinicId) return res.status(400).json({ error: 'Selecciona una clinica destino.' });
+    if (receiverClinicId === clinicId) return res.status(400).json({ error: 'No puedes asociar tu propia clinica.' });
+
+    try {
+        const existing = await db.query(
+            `SELECT * FROM clinic_associations
+             WHERE (
+                (requester_clinic_id = $1 AND receiver_clinic_id = $2)
+                OR (requester_clinic_id = $2 AND receiver_clinic_id = $1)
+             )
+             AND status IN ('pending', 'accepted', 'blocked')
+             LIMIT 1`,
+            [clinicId, receiverClinicId]
+        );
+        if (existing.rows.length > 0) {
+            return res.status(409).json({ error: 'Ya existe una asociacion activa o pendiente con esa clinica.' });
+        }
+        const result = await db.query(
+            `INSERT INTO clinic_associations (requester_clinic_id, receiver_clinic_id, status, message, requested_by)
+             VALUES ($1, $2, 'pending', $3, $1)
+             RETURNING *`,
+            [clinicId, receiverClinicId, message]
+        );
+        await registrarAuditoria(db, { associationId: result.rows[0].id, action: 'association_requested', actorClinicId: clinicId, details: { receiverClinicId } });
+        await crearNotificacion(db, { veterinariaId: receiverClinicId, type: 'association_requested', title: 'Solicitud de asociacion recibida', message: `${req.veterinaria.nombre} quiere asociarse contigo.`, associationId: result.rows[0].id });
+        res.status(201).json({ mensaje: 'Solicitud de asociacion enviada.', association: result.rows[0] });
+    } catch (err) {
+        console.error('Error creando asociacion:', err);
+        res.status(500).json({ error: 'Error al enviar solicitud de asociacion.' });
+    }
+});
+
+app.patch('/api/transferencias/asociaciones/:id', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    const { action } = req.body;
+    const nextStatus = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : action === 'cancel' ? 'cancelled' : action === 'remove' ? 'inactive' : '';
+    if (!nextStatus) return res.status(400).json({ error: 'Accion de asociacion invalida.' });
+
+    try {
+        const assocRes = await db.query('SELECT * FROM clinic_associations WHERE id = $1 AND $2 IN (requester_clinic_id, receiver_clinic_id)', [req.params.id, clinicId]);
+        if (assocRes.rows.length === 0) return res.status(404).json({ error: 'Asociacion no encontrada.' });
+        const assoc = assocRes.rows[0];
+        if ((action === 'accept' || action === 'reject') && assoc.receiver_clinic_id !== clinicId) {
+            return res.status(403).json({ error: 'Solo la clinica receptora puede responder esta solicitud.' });
+        }
+        const result = await db.query(
+            `UPDATE clinic_associations
+             SET status = $1, responded_by = $2, responded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $3
+             RETURNING *`,
+            [nextStatus, clinicId, req.params.id]
+        );
+        const auditAction = nextStatus === 'accepted' ? 'association_accepted' : nextStatus === 'rejected' ? 'association_rejected' : 'association_cancelled';
+        await registrarAuditoria(db, { associationId: req.params.id, action: auditAction, actorClinicId: clinicId, details: { status: nextStatus } });
+        const notifyClinic = assoc.requester_clinic_id === clinicId ? assoc.receiver_clinic_id : assoc.requester_clinic_id;
+        await crearNotificacion(db, { veterinariaId: notifyClinic, type: auditAction, title: `Asociacion ${nextStatus}`, message: `La asociacion cambio a estado ${nextStatus}.`, associationId: req.params.id });
+        res.json({ mensaje: 'Asociacion actualizada.', association: result.rows[0] });
+    } catch (err) {
+        console.error('Error actualizando asociacion:', err);
+        res.status(500).json({ error: 'Error al responder la asociacion.' });
+    }
+});
+
+app.get('/api/transferencias/buzon', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    try {
+        const transferRes = await db.query(
+            `SELECT ptr.id, ptr.request_type, ptr.transfer_type, ptr.status, ptr.reason, ptr.requested_at, ptr.responded_at,
+                    ptr.origin_clinic_id, ptr.destination_clinic_id, ptr.requester_clinic_id, ptr.receiver_clinic_id,
+                    COALESCE(ov.nombre, rv.nombre) AS origin_name,
+                    COALESCE(dv.nombre, cv.nombre) AS destination_name,
+                    COUNT(pti.id)::int AS patient_count,
+                    STRING_AGG(COALESCE(pti.patient_name_snapshot, ''), ', ' ORDER BY pti.created_at) AS patient_names,
+                    MAX(prsd.patient_name) AS search_patient_name,
+                    MAX(prsd.tutor_name) AS search_tutor_name
+             FROM patient_transfer_requests ptr
+             LEFT JOIN veterinarias ov ON ov.id = ptr.origin_clinic_id
+             LEFT JOIN veterinarias dv ON dv.id = ptr.destination_clinic_id
+             LEFT JOIN veterinarias rv ON rv.id = ptr.requester_clinic_id
+             LEFT JOIN veterinarias cv ON cv.id = ptr.receiver_clinic_id
+             LEFT JOIN patient_transfer_items pti ON pti.transfer_request_id = ptr.id
+             LEFT JOIN patient_request_search_data prsd ON prsd.transfer_request_id = ptr.id
+             WHERE $1 IN (ptr.origin_clinic_id, ptr.destination_clinic_id, ptr.requester_clinic_id, ptr.receiver_clinic_id)
+             GROUP BY ptr.id, ov.nombre, dv.nombre, rv.nombre, cv.nombre
+             ORDER BY ptr.requested_at DESC`,
+            [clinicId]
+        );
+        const assocRes = await db.query(
+            `SELECT ca.id, ca.status, ca.requested_at, ca.responded_at, ca.requester_clinic_id, ca.receiver_clinic_id,
+                    rq.nombre AS requester_name, rc.nombre AS receiver_name, ca.message
+             FROM clinic_associations ca
+             JOIN veterinarias rq ON rq.id = ca.requester_clinic_id
+             JOIN veterinarias rc ON rc.id = ca.receiver_clinic_id
+             WHERE $1 IN (ca.requester_clinic_id, ca.receiver_clinic_id)
+             ORDER BY ca.updated_at DESC`,
+            [clinicId]
+        );
+
+        const transfers = transferRes.rows.map(row => ({
+            id: row.id,
+            category: 'transfer',
+            requestType: row.request_type,
+            transferType: row.transfer_type,
+            status: row.status,
+            direction: clinicId === row.destination_clinic_id || clinicId === row.receiver_clinic_id ? 'received' : 'sent',
+            originName: row.origin_name || '',
+            destinationName: row.destination_name || '',
+            requestedAt: fechaISO(row.requested_at),
+            respondedAt: fechaISO(row.responded_at),
+            patientCount: row.patient_count || 0,
+            patientNames: row.patient_names || '',
+            searchPatientName: row.search_patient_name || '',
+            searchTutorName: row.search_tutor_name || '',
+            reason: row.reason || ''
+        }));
+        const associations = assocRes.rows.map(row => ({
+            id: row.id,
+            category: 'association',
+            requestType: 'association',
+            status: row.status,
+            direction: clinicId === row.receiver_clinic_id ? 'received' : 'sent',
+            originName: row.requester_name,
+            destinationName: row.receiver_name,
+            requestedAt: fechaISO(row.requested_at),
+            respondedAt: fechaISO(row.responded_at),
+            patientCount: 0,
+            patientNames: '',
+            reason: row.message || ''
+        }));
+        res.json([...transfers, ...associations].sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt)));
+    } catch (err) {
+        console.error('Error buzon transferencias:', err);
+        res.status(500).json({ error: 'Error al cargar el buzon de transferencias.' });
+    }
+});
+
+app.post('/api/transferencias/enviar', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    const patientIds = Array.isArray(req.body.patientIds) ? [...new Set(req.body.patientIds.filter(Boolean))] : [];
+    const destinationClinicId = req.body.destinationClinicId;
+    const transferType = req.body.transferType || 'reference';
+    const reason = textoLimpio(req.body.reason);
+    const permissions = mapearPermisosTransferencia(req.body.permissions || {});
+    if (patientIds.length === 0) return res.status(400).json({ error: 'Selecciona al menos un paciente.' });
+    if (!destinationClinicId) return res.status(400).json({ error: 'Selecciona una clinica destino.' });
+    if (!['reference', 'definitive'].includes(transferType)) return res.status(400).json({ error: 'Tipo de transferencia invalido.' });
+
+    try {
+        const assoc = await obtenerAsociacionAceptada(db, clinicId, destinationClinicId);
+        if (!assoc) return res.status(403).json({ error: 'Solo puedes enviar pacientes a clinicas asociadas activas.' });
+        const pacientesRes = await db.query(
+            `SELECT id, nombre, codigo, tutor_nombre, especie FROM mascotas WHERE veterinaria_id = $1 AND id = ANY($2)`,
+            [clinicId, patientIds]
+        );
+        if (pacientesRes.rows.length !== patientIds.length) return res.status(403).json({ error: 'Uno o mas pacientes no pertenecen a tu clinica.' });
+
+        const client = await db.pool.connect();
+        try {
+            await client.query('BEGIN');
+            const transferRes = await client.query(
+                `INSERT INTO patient_transfer_requests (request_type, transfer_type, origin_clinic_id, destination_clinic_id, requester_clinic_id, receiver_clinic_id, status, reason, requested_by)
+                 VALUES ('send_patient', $1, $2, $3, $2, $3, 'pending', $4, $2)
+                 RETURNING id`,
+                [transferType, clinicId, destinationClinicId, reason]
+            );
+            const transferId = transferRes.rows[0].id;
+            await client.query(
+                `INSERT INTO patient_transfer_permissions (
+                    transfer_request_id, include_pet_data, include_tutor_data, include_vaccines,
+                    include_internal_deworming, include_external_deworming, include_preventive_history,
+                    include_next_appointments, include_observations, include_photos, include_full_history
+                 )
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+                [transferId, permissions.includePetData, permissions.includeTutorData, permissions.includeVaccines, permissions.includeInternalDeworming, permissions.includeExternalDeworming, permissions.includePreventiveHistory, permissions.includeNextAppointments, permissions.includeObservations, permissions.includePhotos, permissions.includeFullHistory]
+            );
+            for (const paciente of pacientesRes.rows) {
+                await client.query(
+                    `INSERT INTO patient_transfer_items (transfer_request_id, source_patient_id, patient_name_snapshot, patient_code_snapshot, tutor_name_snapshot, species_snapshot)
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    [transferId, paciente.id, paciente.nombre, paciente.codigo, paciente.tutor_nombre, paciente.especie]
+                );
+            }
+            await registrarAuditoria(client, { transferId, action: 'patient_transfer_sent', actorClinicId: clinicId, details: { patientIds, destinationClinicId } });
+            await crearNotificacion(client, { veterinariaId: destinationClinicId, type: 'patient_transfer_sent', title: 'Transferencia de pacientes recibida', message: `${req.veterinaria.nombre} envio ${patientIds.length} paciente(s).`, transferId });
+            await client.query('COMMIT');
+            res.status(201).json({ mensaje: 'Solicitud de transferencia enviada.', transferId });
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error('Error enviando transferencia:', err);
+        res.status(500).json({ error: 'Error al enviar solicitud de transferencia.' });
+    }
+});
+
+app.post('/api/transferencias/solicitar-paciente', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    const receiverClinicId = req.body.receiverClinicId;
+    const transferType = req.body.transferType || 'continuity';
+    const searchData = req.body.searchData || {};
+    const reason = textoLimpio(req.body.reason || searchData.reason);
+    const hasMinimumData = !!(
+        textoLimpio(searchData.patientCode) ||
+        (textoLimpio(searchData.patientName) && textoLimpio(searchData.tutorName)) ||
+        (textoLimpio(searchData.patientName) && textoLimpio(searchData.tutorPhone)) ||
+        textoLimpio(searchData.tutorPhone)
+    );
+    if (!receiverClinicId) return res.status(400).json({ error: 'Selecciona una clinica asociada.' });
+    if (!hasMinimumData) return res.status(400).json({ error: 'Ingresa codigo, telefono o nombre del paciente con tutor.' });
+
+    try {
+        const assoc = await obtenerAsociacionAceptada(db, clinicId, receiverClinicId);
+        if (!assoc) return res.status(403).json({ error: 'Solo puedes solicitar pacientes a clinicas asociadas activas.' });
+        const client = await db.pool.connect();
+        try {
+            await client.query('BEGIN');
+            const transferRes = await client.query(
+                `INSERT INTO patient_transfer_requests (request_type, transfer_type, requester_clinic_id, receiver_clinic_id, origin_clinic_id, destination_clinic_id, status, reason, requested_by)
+                 VALUES ('request_patient', $1, $2, $3, $3, $2, 'pending', $4, $2)
+                 RETURNING id`,
+                [transferType, clinicId, receiverClinicId, reason]
+            );
+            const transferId = transferRes.rows[0].id;
+            await client.query(
+                `INSERT INTO patient_request_search_data (transfer_request_id, patient_name, patient_code, tutor_name, tutor_phone, tutor_email, species, breed, notes)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+                [transferId, textoLimpio(searchData.patientName), textoLimpio(searchData.patientCode), textoLimpio(searchData.tutorName), textoLimpio(searchData.tutorPhone), textoLimpio(searchData.tutorEmail), textoLimpio(searchData.species), textoLimpio(searchData.breed), textoLimpio(searchData.notes)]
+            );
+            await registrarAuditoria(client, { transferId, action: 'patient_requested', actorClinicId: clinicId, details: { receiverClinicId } });
+            await crearNotificacion(client, { veterinariaId: receiverClinicId, type: 'patient_requested', title: 'Solicitud de paciente recibida', message: `${req.veterinaria.nombre} solicita que revises un paciente.`, transferId });
+            await client.query('COMMIT');
+            res.status(201).json({ mensaje: 'Solicitud de paciente enviada.', transferId });
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error('Error solicitando paciente:', err);
+        res.status(500).json({ error: 'Error al solicitar paciente.' });
+    }
+});
+
+app.get('/api/transferencias/:id([0-9a-fA-F-]{36})', authMiddleware, async (req, res) => {
+    try {
+        const detalle = await cargarTransferenciaCompleta(db, req.params.id, req.veterinaria.id);
+        if (!detalle) return res.status(404).json({ error: 'Solicitud no encontrada.' });
+        res.json(detalle);
+    } catch (err) {
+        console.error('Error detalle transferencia:', err);
+        res.status(500).json({ error: 'Error al cargar detalle de transferencia.' });
+    }
+});
+
+app.get('/api/transferencias/:id([0-9a-fA-F-]{36})/coincidencias', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    try {
+        const detail = await cargarTransferenciaCompleta(db, req.params.id, clinicId);
+        if (!detail || detail.requestType !== 'request_patient' || detail.receiverClinicId !== clinicId) {
+            return res.status(403).json({ error: 'No puedes buscar coincidencias para esta solicitud.' });
+        }
+        const s = detail.searchData || {};
+        const result = await db.query(
+            `SELECT * FROM mascotas WHERE veterinaria_id = $1 ORDER BY fecha_registro DESC LIMIT 200`,
+            [clinicId]
+        );
+        const norm = valor => normalizarNombreRaza(valor || '');
+        const matches = result.rows.map(row => {
+            let score = 0;
+            if (s.patientCode && norm(row.codigo) === norm(s.patientCode)) score += 60;
+            if (s.patientName && norm(row.nombre).includes(norm(s.patientName))) score += 20;
+            if (s.tutorName && norm(row.tutor_nombre).includes(norm(s.tutorName))) score += 15;
+            if (s.tutorPhone && norm(row.tutor_telefono).includes(norm(s.tutorPhone))) score += 25;
+            if (s.species && norm(row.especie) === norm(s.species)) score += 8;
+            if (s.breed && norm(row.raza).includes(norm(s.breed))) score += 7;
+            const level = score >= 50 ? 'alta' : score >= 25 ? 'media' : 'baja';
+            return {
+                id: row.id,
+                nombre: row.nombre,
+                codigo: row.codigo,
+                especie: row.especie,
+                raza: row.raza || '',
+                sexo: row.sexo,
+                tutor: { nombre: row.tutor_nombre, telefono: row.tutor_telefono || '' },
+                score,
+                level
+            };
+        }).filter(row => row.score > 0).sort((a, b) => b.score - a.score).slice(0, 15);
+        res.json(matches);
+    } catch (err) {
+        console.error('Error buscando coincidencias:', err);
+        res.status(500).json({ error: 'Error al buscar coincidencias de paciente.' });
+    }
+});
+
+app.post('/api/transferencias/:id([0-9a-fA-F-]{36})/aceptar', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    const selectedPatientId = req.body.selectedPatientId;
+    const permissions = mapearPermisosTransferencia(req.body.permissions || {});
+    const transferTypeOverride = req.body.transferType;
+    try {
+        const detalle = await cargarTransferenciaCompleta(db, req.params.id, clinicId);
+        if (!detalle || detalle.status !== 'pending') return res.status(404).json({ error: 'Solicitud pendiente no encontrada.' });
+        if (detalle.requestType === 'send_patient' && detalle.destinationClinicId !== clinicId) {
+            return res.status(403).json({ error: 'Solo la clinica destino puede aceptar esta transferencia.' });
+        }
+        if (detalle.requestType === 'request_patient' && detalle.receiverClinicId !== clinicId) {
+            return res.status(403).json({ error: 'Solo la clinica receptora puede aprobar esta solicitud.' });
+        }
+
+        const client = await db.pool.connect();
+        try {
+            await client.query('BEGIN');
+            let patientIds = detalle.items.map(item => item.sourcePatientId).filter(Boolean);
+            let destinationClinicId = detalle.destinationClinicId;
+            let notifyClinicId = detalle.originClinicId;
+            let finalTransferType = transferTypeOverride || detalle.transferType;
+            let finalPermissions = detalle.permissions || permissions;
+
+            if (detalle.requestType === 'request_patient') {
+                if (!selectedPatientId) throw new Error('Selecciona el paciente correcto antes de aprobar.');
+                const owned = await client.query('SELECT id, nombre, codigo, tutor_nombre, especie FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [selectedPatientId, clinicId]);
+                if (owned.rows.length === 0) throw new Error('El paciente seleccionado no pertenece a tu clinica.');
+                const itemRes = await client.query(
+                    `INSERT INTO patient_transfer_items (transfer_request_id, source_patient_id, patient_name_snapshot, patient_code_snapshot, tutor_name_snapshot, species_snapshot)
+                     VALUES ($1, $2, $3, $4, $5, $6)
+                     RETURNING id`,
+                    [detalle.id, owned.rows[0].id, owned.rows[0].nombre, owned.rows[0].codigo, owned.rows[0].tutor_nombre, owned.rows[0].especie]
+                );
+                await client.query(
+                    `INSERT INTO patient_transfer_permissions (
+                        transfer_request_id, include_pet_data, include_tutor_data, include_vaccines,
+                        include_internal_deworming, include_external_deworming, include_preventive_history,
+                        include_next_appointments, include_observations, include_photos, include_full_history
+                     )
+                     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                     ON CONFLICT (transfer_request_id) DO UPDATE SET
+                        include_pet_data = EXCLUDED.include_pet_data,
+                        include_tutor_data = EXCLUDED.include_tutor_data,
+                        include_vaccines = EXCLUDED.include_vaccines,
+                        include_internal_deworming = EXCLUDED.include_internal_deworming,
+                        include_external_deworming = EXCLUDED.include_external_deworming,
+                        include_preventive_history = EXCLUDED.include_preventive_history,
+                        include_next_appointments = EXCLUDED.include_next_appointments,
+                        include_observations = EXCLUDED.include_observations,
+                        include_photos = EXCLUDED.include_photos,
+                        include_full_history = EXCLUDED.include_full_history,
+                        updated_at = CURRENT_TIMESTAMP`,
+                    [detalle.id, permissions.includePetData, permissions.includeTutorData, permissions.includeVaccines, permissions.includeInternalDeworming, permissions.includeExternalDeworming, permissions.includePreventiveHistory, permissions.includeNextAppointments, permissions.includeObservations, permissions.includePhotos, permissions.includeFullHistory]
+                );
+                patientIds = [selectedPatientId];
+                destinationClinicId = detalle.requesterClinicId;
+                notifyClinicId = detalle.requesterClinicId;
+                finalPermissions = permissions;
+                await client.query('UPDATE patient_transfer_items SET status = $1 WHERE id = $2', ['pending', itemRes.rows[0].id]);
+            }
+
+            for (const patientId of patientIds) {
+                await copiarPacienteAutorizado(client, patientId, destinationClinicId, detalle.id, finalPermissions);
+            }
+            if (finalTransferType === 'definitive') {
+                await client.query(
+                    `UPDATE mascotas SET transfer_status = 'transferred_out' WHERE id = ANY($1) AND veterinaria_id = $2`,
+                    [patientIds, detalle.originClinicId || clinicId]
+                );
+            }
+            await client.query(
+                `UPDATE patient_transfer_requests
+                 SET status = 'accepted', transfer_type = COALESCE($1, transfer_type), responded_by = $2, responded_at = CURRENT_TIMESTAMP, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $3`,
+                [finalTransferType, clinicId, detalle.id]
+            );
+            await registrarAuditoria(client, { transferId: detalle.id, action: detalle.requestType === 'send_patient' ? 'patient_transfer_accepted' : 'patient_request_accepted', actorClinicId: clinicId, details: { patientIds, destinationClinicId } });
+            await crearNotificacion(client, { veterinariaId: notifyClinicId, type: 'patient_transfer_accepted', title: 'Solicitud aceptada', message: 'La solicitud fue aceptada y el paciente fue copiado segun permisos.', transferId: detalle.id });
+            await client.query('COMMIT');
+            res.json({ mensaje: 'Solicitud aceptada. Paciente copiado segun permisos.' });
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    } catch (err) {
+        console.error('Error aceptando transferencia:', err);
+        res.status(500).json({ error: err.message || 'Error al aceptar transferencia.' });
+    }
+});
+
+app.post('/api/transferencias/:id([0-9a-fA-F-]{36})/rechazar', authMiddleware, async (req, res) => {
+    const clinicId = req.veterinaria.id;
+    const rejectionReason = textoLimpio(req.body.rejectionReason);
+    try {
+        const detalle = await cargarTransferenciaCompleta(db, req.params.id, clinicId);
+        if (!detalle || detalle.status !== 'pending') return res.status(404).json({ error: 'Solicitud pendiente no encontrada.' });
+        if (detalle.requestType === 'send_patient' && detalle.destinationClinicId !== clinicId) {
+            return res.status(403).json({ error: 'Solo la clinica destino puede rechazar esta transferencia.' });
+        }
+        if (detalle.requestType === 'request_patient' && detalle.receiverClinicId !== clinicId) {
+            return res.status(403).json({ error: 'Solo la clinica receptora puede rechazar esta solicitud.' });
+        }
+        await db.query(
+            `UPDATE patient_transfer_requests
+             SET status = 'rejected', rejection_reason = $1, responded_by = $2, responded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $3`,
+            [rejectionReason, clinicId, detalle.id]
+        );
+        const notifyClinicId = detalle.requestType === 'send_patient' ? detalle.originClinicId : detalle.requesterClinicId;
+        await registrarAuditoria(db, { transferId: detalle.id, action: detalle.requestType === 'send_patient' ? 'patient_transfer_rejected' : 'patient_request_rejected', actorClinicId: clinicId, details: { rejectionReason } });
+        await crearNotificacion(db, { veterinariaId: notifyClinicId, type: 'patient_transfer_rejected', title: 'Solicitud rechazada', message: rejectionReason || 'La solicitud fue rechazada.', transferId: detalle.id });
+        res.json({ mensaje: 'Solicitud rechazada.' });
+    } catch (err) {
+        console.error('Error rechazando transferencia:', err);
+        res.status(500).json({ error: 'Error al rechazar solicitud.' });
     }
 });
 

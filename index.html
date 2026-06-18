@@ -9,20 +9,23 @@
 </head>
 <body>
 
-    <button id="sidebar-toggle" class="sidebar-toggle no-print" type="button" aria-label="Abrir menu clinico">
-        <span></span><span></span><span></span>
-    </button>
     <div id="sidebar-backdrop" class="sidebar-backdrop no-print" aria-hidden="true"></div>
 
     <!-- CABECERA PRINCIPAL (HEADER) - Oculta en Modo Público -->
-    <header class="header clinical-sidebar" role="banner">
-        <div class="logo-container" id="brand-logo" role="button" aria-label="Volver al inicio">
-            <img src="assets/logo-placeholder.png" alt="Logotipo Cartilla Digital" class="logo-img">
-            <div class="logo-copy">
-                <h1 class="logo-text">Cartilla<span>Digital</span></h1>
-                <p class="sidebar-subtitle">Sistema clinico veterinario</p>
+    <aside id="app-sidebar" class="clinical-sidebar no-print" aria-label="Navegacion principal">
+        <section class="sidebar-clinic-card" aria-label="Informacion de la veterinaria">
+            <div class="sidebar-clinic-logo-wrap">
+                <img id="sidebar-clinic-logo" class="sidebar-clinic-logo" src="assets/logo-placeholder.png" alt="Logo de la veterinaria">
+                <span id="sidebar-clinic-initials" class="sidebar-clinic-initials" aria-hidden="true">CD</span>
             </div>
-        </div>
+            <div class="sidebar-clinic-copy">
+                <h2 id="sidebar-clinic-name">Clinica San Martin</h2>
+                <p id="sidebar-clinic-owner">Dr. Juan Perez</p>
+                <p id="sidebar-clinic-phone">099 123 4567</p>
+                <p id="sidebar-clinic-email">correo@clinica.com</p>
+                <p class="sidebar-clinic-status"><span aria-hidden="true"></span> Clinica activa</p>
+            </div>
+        </section>
         <nav class="nav sidebar-nav" role="navigation" aria-label="Menú principal de administración">
             <button class="nav-btn active" data-section="inicio" aria-current="page">
                 <span class="nav-icon">🏠</span>
@@ -40,6 +43,10 @@
                 <span class="nav-icon">🏦</span>
                 <span class="nav-text">Banco</span>
             </button>
+            <button class="nav-btn" data-section="transferencia">
+                <span class="nav-icon">⇄</span>
+                <span class="nav-text">Transferencia</span>
+            </button>
             <button class="nav-btn" data-section="configuracion">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-text">Configurar</span>
@@ -53,10 +60,22 @@
                 <span class="nav-text">Salir</span>
             </button>
         </nav>
-    </header>
+    </aside>
 
     <!-- CONTENEDOR PRINCIPAL -->
     <main class="container" role="main">
+        <header class="app-header no-print" role="banner">
+            <button id="sidebar-toggle" class="sidebar-toggle no-print" type="button" aria-label="Abrir menu clinico" aria-controls="app-sidebar" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="brand-header" id="brand-logo" role="button" tabindex="0" aria-label="Volver al inicio">
+                <img src="assets/logo-placeholder.png" alt="Logotipo Cartilla Digital" class="brand-logo-img">
+                <div class="brand-copy">
+                    <h1 class="brand-title">Cartilla<span>Digital</span></h1>
+                    <p class="brand-subtitle">Sistema clinico veterinario</p>
+                </div>
+            </div>
+        </header>
 
         <!-- ================= MÓDULO: LOGIN ================= -->
         <section id="section-login" class="app-section" aria-labelledby="login-title">
@@ -292,6 +311,15 @@
 
 
         <!-- ================= MÓDULO 2: CONFIGURACIÓN DE VETERINARIA ================= -->
+        <section id="section-transferencia" class="app-section" aria-labelledby="transfer-title">
+            <div id="transferencia-root" class="transfer-shell">
+                <div class="transfer-loading-card">
+                    <strong>Cargando transferencia de pacientes...</strong>
+                    <span>Preparando asociaciones, buzón y pacientes.</span>
+                </div>
+            </div>
+        </section>
+
         <section id="section-configuracion" class="app-section" aria-labelledby="config-title">
             <div class="form-card">
                 <h2 id="config-title" class="form-title">Configuración de la Veterinaria</h2>
@@ -1682,6 +1710,7 @@
     <script src="js/controles.js"></script>
     <script src="js/banco.js"></script>
     <script src="js/equipo.js"></script>
+    <script src="js/transferencias.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/app.js"></script>
 </body>

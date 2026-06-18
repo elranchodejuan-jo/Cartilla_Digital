@@ -50,6 +50,7 @@ const DOM = {
         pacientes: document.getElementById('section-pacientes'),
         cartilla: document.getElementById('section-cartilla'),
         banco: document.getElementById('section-banco'),
+        transferencia: document.getElementById('section-transferencia'),
         equipo: document.getElementById('section-equipo')
     },
     navButtons: document.querySelectorAll('.nav-btn'),
@@ -97,6 +98,7 @@ function inicializarUI() {
     DOM.navButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             if (UIState.modoPublico) return;
+            if (btn.classList.contains('nav-parent')) return;
             const seccion = btn.dataset.section;
             navegarA(seccion);
         });
@@ -105,6 +107,12 @@ function inicializarUI() {
     if (DOM.brandLogo) {
         DOM.brandLogo.addEventListener('click', () => {
             if (!UIState.modoPublico) navegarA('inicio');
+        });
+        DOM.brandLogo.addEventListener('keydown', (e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && !UIState.modoPublico) {
+                e.preventDefault();
+                navegarA('inicio');
+            }
         });
     }
     
@@ -199,8 +207,9 @@ function configurarSidebarClinico() {
         const btn = nav.querySelector(`.nav-btn[data-section="${section}"]`);
         if (!btn || btn.closest('.nav-group')) return;
         const group = document.createElement('div');
-        group.className = `nav-group ${section === 'pacientes' ? 'open' : ''}`;
+        group.className = 'nav-group';
         btn.classList.add('nav-parent');
+        btn.setAttribute('aria-expanded', 'false');
         btn.insertAdjacentHTML('beforeend', '<span class="nav-caret">⌄</span>');
         btn.parentNode.insertBefore(group, btn);
         group.appendChild(btn);
@@ -240,15 +249,103 @@ function configurarSidebarClinico() {
     nav.querySelectorAll('.nav-parent').forEach(btn => {
         btn.addEventListener('click', () => {
             const group = btn.closest('.nav-group');
-            if (group) group.classList.toggle('open');
+            if (!group) return;
+            const isOpen = group.classList.toggle('open');
+            btn.setAttribute('aria-expanded', String(isOpen));
         });
     });
 
+    function cerrarSubmenus() {
+        nav.querySelectorAll('.nav-group.open').forEach(group => {
+            group.classList.remove('open');
+            const parent = group.querySelector('.nav-parent');
+            if (parent) parent.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    const esSidebarMovil = () => (
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(max-width: 768px)').matches
+    );
+    const sincronizarEstadoSidebar = () => {
+        if (!sidebarToggle) return;
+        const expandido = esSidebarMovil()
+            ? document.body.classList.contains('sidebar-open')
+            : !document.body.classList.contains('sidebar-collapsed');
+        sidebarToggle.setAttribute('aria-expanded', String(expandido));
+    };
+
     window.cerrarSidebarMovil = function() {
         document.body.classList.remove('sidebar-open');
+        if (esSidebarMovil()) sincronizarEstadoSidebar();
     };
-    if (sidebarToggle) sidebarToggle.addEventListener('click', () => document.body.classList.add('sidebar-open'));
+    if (sidebarToggle) sidebarToggle.addEventListener('click', () => {
+        if (esSidebarMovil()) {
+            document.body.classList.remove('sidebar-collapsed');
+            const abrir = !document.body.classList.contains('sidebar-open');
+            if (abrir) cerrarSubmenus();
+            document.body.classList.toggle('sidebar-open', abrir);
+        } else {
+            document.body.classList.remove('sidebar-open');
+            const contraer = !document.body.classList.contains('sidebar-collapsed');
+            if (contraer) cerrarSubmenus();
+            document.body.classList.toggle('sidebar-collapsed', contraer);
+        }
+        sincronizarEstadoSidebar();
+    });
     if (backdrop) backdrop.addEventListener('click', window.cerrarSidebarMovil);
+    window.addEventListener('resize', () => {
+        if (esSidebarMovil()) {
+            document.body.classList.remove('sidebar-collapsed');
+        } else {
+            document.body.classList.remove('sidebar-open');
+        }
+        sincronizarEstadoSidebar();
+    });
+    sincronizarEstadoSidebar();
+    actualizarSidebarClinica();
+}
+
+function actualizarSidebarClinica() {
+    const vet = obtenerVeterinaria() || {};
+    const nombre = vet.nombre || 'Clinica San Martin';
+    const propietario = vet.propietario || 'Dr. Juan Perez';
+    const telefono = vet.telefono || '099 123 4567';
+    const email = vet.email || vet.correo || 'correo@clinica.com';
+    const iniciales = vet.iniciales
+        ? String(vet.iniciales).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5)
+        : nombre
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(parte => parte.charAt(0))
+            .join('')
+            .toUpperCase()
+            .slice(0, 3) || 'CD';
+
+    const logoWrap = document.querySelector('.sidebar-clinic-logo-wrap');
+    const logo = document.getElementById('sidebar-clinic-logo');
+    const initials = document.getElementById('sidebar-clinic-initials');
+    const nameEl = document.getElementById('sidebar-clinic-name');
+    const ownerEl = document.getElementById('sidebar-clinic-owner');
+    const phoneEl = document.getElementById('sidebar-clinic-phone');
+    const emailEl = document.getElementById('sidebar-clinic-email');
+
+    if (nameEl) nameEl.textContent = nombre;
+    if (ownerEl) ownerEl.textContent = propietario;
+    if (phoneEl) phoneEl.textContent = telefono;
+    if (emailEl) emailEl.textContent = email;
+    if (initials) initials.textContent = iniciales;
+
+    if (logoWrap && logo) {
+        if (vet.logo) {
+            logo.src = vet.logo;
+            logoWrap.classList.add('has-logo');
+        } else {
+            logo.removeAttribute('src');
+            logoWrap.classList.remove('has-logo');
+        }
+    }
 }
 
 function configurarFiltrosDashboard() {
@@ -372,7 +469,10 @@ async function navegarA(seccionId) {
     } else if (seccionId === 'banco') {
         cambiarPestañaBanco(bancoPestañaActiva);
     }
-    
+    if (seccionId === 'transferencia' && typeof renderizarTransferencias === 'function') {
+        await renderizarTransferencias();
+    }
+
     if (typeof cerrarSidebarMovil === 'function') cerrarSidebarMovil();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -510,6 +610,7 @@ function cargarDatosFormVeterinaria() {
             preview.style.display = 'block';
         }
     }
+    actualizarSidebarClinica();
 }
 
 /**
@@ -1947,7 +2048,7 @@ async function abrirModalObservaciones() {
  * @param {boolean} loggedIn - True si el usuario tiene sesión activa
  */
 function actualizarUIConEstadoAuth(loggedIn) {
-    const nav = document.querySelector('.header .nav');
+    const nav = document.querySelector('.sidebar-nav');
     const logoutBtn = document.getElementById('nav-btn-logout');
     
     if (nav) {
@@ -1956,6 +2057,7 @@ function actualizarUIConEstadoAuth(loggedIn) {
     if (logoutBtn) {
         logoutBtn.style.display = loggedIn ? 'block' : 'none';
     }
+    actualizarSidebarClinica();
 }
 
 function abrirModalTransferencia() {

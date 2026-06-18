@@ -448,6 +448,110 @@ const API = {
     },
 
     // --- RECUPERACIÓN DE CONTRASEÑA ---
+    async obtenerResumenTransferencias() {
+        const res = await fetch(`${API_BASE_URL}/transferencias/dashboard`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async buscarClinicasTransferencia(query = '') {
+        const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+        const res = await fetch(`${API_BASE_URL}/transferencias/clinicas${qs}`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async listarAsociacionesTransferencia(status = '') {
+        const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+        const res = await fetch(`${API_BASE_URL}/transferencias/asociaciones${qs}`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async enviarSolicitudAsociacion(receiverClinicId, message = '') {
+        const res = await fetch(`${API_BASE_URL}/transferencias/asociaciones`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ receiverClinicId, message })
+        });
+        return this.handleResponse(res);
+    },
+
+    async responderAsociacion(id, action) {
+        const res = await fetch(`${API_BASE_URL}/transferencias/asociaciones/${id}`, {
+            method: 'PATCH',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ action })
+        });
+        return this.handleResponse(res);
+    },
+
+    async obtenerBuzonTransferencias() {
+        const res = await fetch(`${API_BASE_URL}/transferencias/buzon`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async enviarTransferenciaPacientes(datos) {
+        const res = await fetch(`${API_BASE_URL}/transferencias/enviar`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async solicitarPacienteTransferencia(datos) {
+        const res = await fetch(`${API_BASE_URL}/transferencias/solicitar-paciente`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async obtenerDetalleTransferencia(id) {
+        const res = await fetch(`${API_BASE_URL}/transferencias/${id}`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async buscarCoincidenciasTransferencia(id) {
+        const res = await fetch(`${API_BASE_URL}/transferencias/${id}/coincidencias`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async aceptarTransferencia(id, datos = {}) {
+        const res = await fetch(`${API_BASE_URL}/transferencias/${id}/aceptar`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async rechazarTransferencia(id, rejectionReason = '') {
+        const res = await fetch(`${API_BASE_URL}/transferencias/${id}/rechazar`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ rejectionReason })
+        });
+        return this.handleResponse(res);
+    },
+
     async forgotPassword(email) {
         const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
             method: 'POST',

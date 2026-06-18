@@ -158,6 +158,164 @@ const migrarBaseDatos = async () => {
 
             CREATE INDEX IF NOT EXISTS idx_equipo_veterinaria ON equipo_veterinario(veterinaria_id);
             CREATE INDEX IF NOT EXISTS idx_razas_clinica_veterinaria ON razas_clinica(veterinaria_id);
+
+            ALTER TABLE mascotas
+                ADD COLUMN IF NOT EXISTS source_veterinaria_id UUID REFERENCES veterinarias(id) ON DELETE SET NULL,
+                ADD COLUMN IF NOT EXISTS source_mascota_id UUID REFERENCES mascotas(id) ON DELETE SET NULL,
+                ADD COLUMN IF NOT EXISTS received_by_transfer BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS transfer_request_id UUID,
+                ADD COLUMN IF NOT EXISTS transfer_status VARCHAR(30) DEFAULT 'active';
+
+            CREATE INDEX IF NOT EXISTS idx_mascotas_source ON mascotas(source_veterinaria_id, source_mascota_id);
+            CREATE INDEX IF NOT EXISTS idx_mascotas_transfer_request ON mascotas(transfer_request_id);
+
+            CREATE TABLE IF NOT EXISTS clinic_associations (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                requester_clinic_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+                receiver_clinic_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                message TEXT,
+                requested_by UUID REFERENCES veterinarias(id) ON DELETE SET NULL,
+                responded_by UUID REFERENCES veterinarias(id) ON DELETE SET NULL,
+                requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                responded_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CHECK (requester_clinic_id <> receiver_clinic_id),
+                CHECK (status IN ('pending', 'accepted', 'rejected', 'cancelled', 'blocked', 'inactive'))
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_clinic_associations_pair
+                ON clinic_associations (
+                    LEAST(requester_clinic_id, receiver_clinic_id),
+                    GREATEST(requester_clinic_id, receiver_clinic_id)
+                )
+                WHERE status IN ('pending', 'accepted', 'blocked');
+            CREATE INDEX IF NOT EXISTS idx_clinic_associations_requester ON clinic_associations(requester_clinic_id);
+            CREATE INDEX IF NOT EXISTS idx_clinic_associations_receiver ON clinic_associations(receiver_clinic_id);
+            CREATE INDEX IF NOT EXISTS idx_clinic_associations_status ON clinic_associations(status);
+
+            CREATE TABLE IF NOT EXISTS patient_transfer_requests (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                request_type VARCHAR(30) NOT NULL,
+                transfer_type VARCHAR(40) NOT NULL,
+                origin_clinic_id UUID REFERENCES veterinarias(id) ON DELETE CASCADE,
+                destination_clinic_id UUID REFERENCES veterinarias(id) ON DELETE CASCADE,
+                requester_clinic_id UUID REFERENCES veterinarias(id) ON DELETE CASCADE,
+                receiver_clinic_id UUID REFERENCES veterinarias(id) ON DELETE CASCADE,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                reason TEXT,
+                rejection_reason TEXT,
+                requested_by UUID REFERENCES veterinarias(id) ON DELETE SET NULL,
+                responded_by UUID REFERENCES veterinarias(id) ON DELETE SET NULL,
+                requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                responded_at TIMESTAMP,
+                completed_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CHECK (request_type IN ('send_patient', 'request_patient')),
+                CHECK (status IN ('pending', 'accepted', 'rejected', 'cancelled', 'completed', 'expired')),
+                CHECK (transfer_type IN ('reference', 'definitive', 'history_consultation', 'emergency', 'continuity', 'other'))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_patient_transfer_origin ON patient_transfer_requests(origin_clinic_id);
+            CREATE INDEX IF NOT EXISTS idx_patient_transfer_destination ON patient_transfer_requests(destination_clinic_id);
+            CREATE INDEX IF NOT EXISTS idx_patient_transfer_requester ON patient_transfer_requests(requester_clinic_id);
+            CREATE INDEX IF NOT EXISTS idx_patient_transfer_receiver ON patient_transfer_requests(receiver_clinic_id);
+            CREATE INDEX IF NOT EXISTS idx_patient_transfer_status ON patient_transfer_requests(status);
+
+            CREATE TABLE IF NOT EXISTS patient_transfer_items (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                transfer_request_id UUID NOT NULL REFERENCES patient_transfer_requests(id) ON DELETE CASCADE,
+                source_patient_id UUID REFERENCES mascotas(id) ON DELETE SET NULL,
+                copied_patient_id UUID REFERENCES mascotas(id) ON DELETE SET NULL,
+                patient_name_snapshot TEXT,
+                patient_code_snapshot TEXT,
+                tutor_name_snapshot TEXT,
+                species_snapshot TEXT,
+                status VARCHAR(20) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_patient_transfer_items_request ON patient_transfer_items(transfer_request_id);
+            CREATE INDEX IF NOT EXISTS idx_patient_transfer_items_source ON patient_transfer_items(source_patient_id);
+
+            CREATE TABLE IF NOT EXISTS patient_request_search_data (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                transfer_request_id UUID NOT NULL REFERENCES patient_transfer_requests(id) ON DELETE CASCADE,
+                patient_name TEXT,
+                patient_code TEXT,
+                tutor_name TEXT,
+                tutor_phone TEXT,
+                tutor_email TEXT,
+                species TEXT,
+                breed TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_patient_request_search_transfer ON patient_request_search_data(transfer_request_id);
+
+            CREATE TABLE IF NOT EXISTS patient_transfer_permissions (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                transfer_request_id UUID NOT NULL REFERENCES patient_transfer_requests(id) ON DELETE CASCADE,
+                include_pet_data BOOLEAN DEFAULT TRUE,
+                include_tutor_data BOOLEAN DEFAULT TRUE,
+                include_vaccines BOOLEAN DEFAULT FALSE,
+                include_internal_deworming BOOLEAN DEFAULT FALSE,
+                include_external_deworming BOOLEAN DEFAULT FALSE,
+                include_preventive_history BOOLEAN DEFAULT FALSE,
+                include_next_appointments BOOLEAN DEFAULT FALSE,
+                include_observations BOOLEAN DEFAULT FALSE,
+                include_photos BOOLEAN DEFAULT FALSE,
+                include_full_history BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (transfer_request_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS transfer_audit_logs (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                transfer_request_id UUID REFERENCES patient_transfer_requests(id) ON DELETE SET NULL,
+                association_id UUID REFERENCES clinic_associations(id) ON DELETE SET NULL,
+                action VARCHAR(60) NOT NULL,
+                actor_user_id UUID REFERENCES veterinarias(id) ON DELETE SET NULL,
+                actor_clinic_id UUID REFERENCES veterinarias(id) ON DELETE SET NULL,
+                details JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_transfer_audit_request ON transfer_audit_logs(transfer_request_id);
+            CREATE INDEX IF NOT EXISTS idx_transfer_audit_association ON transfer_audit_logs(association_id);
+            CREATE INDEX IF NOT EXISTS idx_transfer_audit_clinic ON transfer_audit_logs(actor_clinic_id);
+
+            CREATE TABLE IF NOT EXISTS internal_notifications (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                veterinaria_id UUID NOT NULL REFERENCES veterinarias(id) ON DELETE CASCADE,
+                type VARCHAR(60) NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT,
+                related_transfer_id UUID REFERENCES patient_transfer_requests(id) ON DELETE SET NULL,
+                related_association_id UUID REFERENCES clinic_associations(id) ON DELETE SET NULL,
+                read_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_internal_notifications_vet ON internal_notifications(veterinaria_id, read_at, created_at);
+
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'fk_mascotas_transfer_request'
+                ) THEN
+                    ALTER TABLE mascotas
+                        ADD CONSTRAINT fk_mascotas_transfer_request
+                        FOREIGN KEY (transfer_request_id) REFERENCES patient_transfer_requests(id) ON DELETE SET NULL;
+                END IF;
+            END $$;
         `);
         console.log('Migración de base de datos verificada y al día.');
     } catch (e) {

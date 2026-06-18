@@ -245,6 +245,9 @@ function configurarManejadoresFormularios() {
                 mostrarToast('Actualizando configuración...', 'info');
                 const res = await guardarVeterinaria(datos);
                 if (res) {
+                    if (typeof actualizarSidebarClinica === 'function') {
+                        actualizarSidebarClinica();
+                    }
                     if (typeof cargarEquipoVeterinario === 'function') {
                         await cargarEquipoVeterinario();
                     }
