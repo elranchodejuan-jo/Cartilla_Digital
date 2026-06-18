@@ -1,5 +1,22 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+function resolverSslDb() {
+    const valor = (process.env.DB_SSL || '').toLowerCase().trim();
+    if (['1', 'true', 'yes', 'require'].includes(valor)) {
+        return { rejectUnauthorized: false };
+    }
+    if (['0', 'false', 'no', 'disable'].includes(valor)) {
+        return false;
+    }
+
+    const host = (process.env.DB_HOST || '').toLowerCase();
+    const requiereSsl = ['supabase', 'neon.tech', 'render.com', 'amazonaws.com', 'railway.app']
+        .some(fragmento => host.includes(fragmento));
+
+    return requiereSsl ? { rejectUnauthorized: false } : false;
+}
 
 const pool = new Pool({
     user: process.env.DB_USER,
@@ -7,9 +24,7 @@ const pool = new Pool({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     database: process.env.DB_NAME,
-    ssl: {
-        rejectUnauthorized: false // Requerido para conexiones seguras en Supabase
-    }
+    ssl: resolverSslDb()
 });
 
 // Automatizar migración de columnas del tutor si no existen
@@ -22,6 +37,9 @@ const migrarBaseDatos = async () => {
             ADD COLUMN IF NOT EXISTS tutor_nombre VARCHAR(150) NOT NULL DEFAULT 'Sin Tutor',
             ADD COLUMN IF NOT EXISTS tutor_telefono VARCHAR(50),
             ADD COLUMN IF NOT EXISTS tutor_direccion TEXT;
+
+            ALTER TABLE veterinarias
+            ADD COLUMN IF NOT EXISTS propietario VARCHAR(150);
         `);
         await pool.query(`
             CREATE TABLE IF NOT EXISTS password_resets (

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS veterinarias (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     nombre VARCHAR(255) NOT NULL,
+    propietario VARCHAR(150),
     iniciales VARCHAR(10) UNIQUE NOT NULL,
     telefono VARCHAR(50),
     direccion TEXT,

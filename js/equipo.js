@@ -4,6 +4,30 @@
 
 let equipoVeterinario = [];
 
+const PREFIJOS_CARGO = {
+    'Medico veterinario': 'MV.',
+    'Médico veterinario': 'MV.',
+    'Doctor': 'Dr.',
+    'Doctora': 'Dra.',
+    'Auxiliar veterinario': 'Aux.',
+    'Ayudante': 'Ayud.',
+    'Administrador': 'Admin.',
+    'Recepcionista': 'Recep.',
+    'Groomer': 'Groomer',
+    'Pasante': 'Pas.',
+    'Especialista': 'Esp.'
+};
+
+function limpiarPrefijoProfesional(nombre = '') {
+    return String(nombre).replace(/^(MV\.|Dr\.|Dra\.|Aux\.|Ayud\.|Admin\.|Recep\.|Pas\.|Esp\.)\s+/i, '').trim();
+}
+
+function generarNombreProfesional(nombre = '', cargo = '') {
+    const base = limpiarPrefijoProfesional(nombre);
+    const prefijo = PREFIJOS_CARGO[cargo] || '';
+    return prefijo ? `${prefijo} ${base}`.trim() : base;
+}
+
 async function cargarEquipoVeterinario() {
     equipoVeterinario = await obtenerEquipo();
     renderizarTablaEquipo();
@@ -23,7 +47,7 @@ function renderizarTablaEquipo() {
     equipoVeterinario.forEach(miembro => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${miembro.nombre}</td>
+            <td><strong>${miembro.nombre}</strong>${miembro.es_principal ? '<br><small>Principal</small>' : ''}</td>
             <td>${miembro.cargo}</td>
             <td>
                 <span class="badge ${miembro.estado === 'activo' ? 'badge-success' : 'badge-danger'}">
@@ -49,13 +73,14 @@ function abrirModalEquipo(id = null) {
         const miembro = equipoVeterinario.find(m => m.id === id);
         if (miembro) {
             document.getElementById('eq-id').value = miembro.id;
-            document.getElementById('eq-nombre').value = miembro.nombre;
+            document.getElementById('eq-nombre').value = limpiarPrefijoProfesional(miembro.nombre);
             document.getElementById('eq-cargo').value = miembro.cargo;
             document.getElementById('eq-estado').value = miembro.estado;
             document.getElementById('eq-estado-group').style.display = 'block';
             document.getElementById('modal-equipo-title').textContent = 'Editar Responsable';
         }
     }
+    actualizarPreviewProfesional();
     
     document.getElementById('modal-equipo').classList.add('active');
 }
@@ -67,13 +92,19 @@ function cerrarModalEquipo() {
 // Inicializar listener de formulario
 document.addEventListener('DOMContentLoaded', () => {
     const formEquipo = document.getElementById('form-equipo');
+    const nombreInput = document.getElementById('eq-nombre');
+    const cargoInput = document.getElementById('eq-cargo');
+    if (nombreInput) nombreInput.addEventListener('input', actualizarPreviewProfesional);
+    if (cargoInput) cargoInput.addEventListener('change', actualizarPreviewProfesional);
     if (formEquipo) {
         formEquipo.addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('eq-id').value;
+            const cargo = document.getElementById('eq-cargo').value;
+            const nombreProfesional = generarNombreProfesional(document.getElementById('eq-nombre').value.trim(), cargo);
             const datos = {
-                nombre: document.getElementById('eq-nombre').value.trim(),
-                cargo: document.getElementById('eq-cargo').value.trim(),
+                nombre: nombreProfesional,
+                cargo,
                 estado: id ? document.getElementById('eq-estado').value : 'activo'
             };
             
@@ -95,6 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Función para poblar selects en los modales de historial médico
+function actualizarPreviewProfesional() {
+    const preview = document.getElementById('eq-profesional-preview');
+    const nombre = document.getElementById('eq-nombre')?.value || 'Nombre Apellido';
+    const cargo = document.getElementById('eq-cargo')?.value || 'Medico veterinario';
+    if (preview) preview.textContent = generarNombreProfesional(nombre, cargo);
+}
+
 function poblarSelectResponsables(selectId, responsableActualId = null) {
     const select = document.getElementById(selectId);
     if (!select) return;

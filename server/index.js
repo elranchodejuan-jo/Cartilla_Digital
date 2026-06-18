@@ -30,6 +30,25 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+app.get('/api/health', async (req, res) => {
+    try {
+        await db.query('SELECT 1');
+        res.json({
+            status: 'ok',
+            database: 'ok',
+            service: 'cartilla-digital-api',
+            time: new Date().toISOString()
+        });
+    } catch (err) {
+        res.status(503).json({
+            status: 'degraded',
+            database: 'error',
+            service: 'cartilla-digital-api',
+            error: err.message
+        });
+    }
+});
+
 function normalizarEspecieRaza(especie) {
     const valor = (especie || '').toLowerCase().trim();
     if (valor === 'perro' || valor === 'canino' || valor === 'p') return 'Canino';
@@ -50,16 +69,42 @@ function formatearNombreRaza(nombre) {
     return (nombre || '').trim().replace(/\s+/g, ' ');
 }
 
+function normalizarTextoPerfil(valor) {
+    return (valor || '').trim().replace(/\s+/g, ' ');
+}
+
+async function sincronizarPropietarioConEquipo(veterinariaId, propietario, queryable = db) {
+    const nombrePropietario = normalizarTextoPerfil(propietario);
+    if (!nombrePropietario) return;
+
+    const query = queryable.query.bind(queryable);
+    await query(
+        `
+        WITH actualizado AS (
+            UPDATE equipo_veterinario
+            SET nombre = $2, estado = 'activo', es_principal = TRUE
+            WHERE veterinaria_id = $1 AND es_principal = TRUE
+            RETURNING id
+        )
+        INSERT INTO equipo_veterinario (veterinaria_id, nombre, cargo, estado, es_principal)
+        SELECT $1, $2, 'Medico veterinario', 'activo', TRUE
+        WHERE NOT EXISTS (SELECT 1 FROM actualizado)
+        `,
+        [veterinariaId, nombrePropietario]
+    );
+}
+
 // --- RUTAS DE AUTENTICACIÓN ---
 
 /**
  * Registro de nueva clínica veterinaria
  */
 app.post('/api/auth/register', async (req, res) => {
-    const { email, password, nombre, iniciales, telefono, direccion, logo } = req.body;
+    const { email, password, nombre, propietario, iniciales, telefono, direccion, logo } = req.body;
+    const propietarioLimpio = normalizarTextoPerfil(propietario);
     
-    if (!email || !password || !nombre || !iniciales) {
-        return res.status(400).json({ error: 'Faltan campos requeridos (email, contraseña, nombre, iniciales).' });
+    if (!email || !password || !nombre || !propietarioLimpio || !iniciales) {
+        return res.status(400).json({ error: 'Faltan campos requeridos (email, contrasena, nombre, propietario, iniciales).' });
     }
     
     const inicialesUpper = iniciales.trim().toUpperCase();
@@ -73,22 +118,19 @@ app.post('/api/auth/register', async (req, res) => {
         const passwordHash = await bcrypt.hash(password, salt);
         
         const queryText = `
-            INSERT INTO veterinarias (email, password_hash, nombre, iniciales, telefono, direccion, logo_base64)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id, email, nombre, iniciales
+            INSERT INTO veterinarias (email, password_hash, nombre, propietario, iniciales, telefono, direccion, logo_base64)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id, email, nombre, propietario, iniciales
         `;
         // Subir logo a Storage si es Base64
         const logoFinal = await subirImagenAStorage(logo, 'logos');
-        const values = [email.trim().toLowerCase(), passwordHash, nombre.trim(), inicialesUpper, telefono, direccion, logoFinal];
+        const values = [email.trim().toLowerCase(), passwordHash, nombre.trim(), propietarioLimpio, inicialesUpper, telefono, direccion, logoFinal];
         
         const result = await db.query(queryText, values);
         const vetId = result.rows[0].id;
         
-        // Agregar al dueño como médico principal automático
-        await db.query(
-            `INSERT INTO equipo_veterinario (veterinaria_id, nombre, cargo, es_principal) VALUES ($1, $2, $3, $4)`,
-            [vetId, nombre.trim(), 'Médico Veterinario Principal', true]
-        );
+        // Sincronizar el propietario como responsable principal del equipo.
+        await sincronizarPropietarioConEquipo(vetId, propietarioLimpio);
         
         res.status(201).json({ mensaje: 'Clínica registrada con éxito.', veterinaria: result.rows[0] });
     } catch (err) {
@@ -144,6 +186,7 @@ app.post('/api/auth/login', async (req, res) => {
                 id: vet.id,
                 email: vet.email,
                 nombre: vet.nombre,
+                propietario: vet.propietario,
                 iniciales: vet.iniciales,
                 telefono: vet.telefono,
                 direccion: vet.direccion,
@@ -280,7 +323,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
 app.get('/api/veterinaria', authMiddleware, async (req, res) => {
     try {
-        const result = await db.query('SELECT id, email, nombre, iniciales, telefono, direccion, logo_base64 AS logo FROM veterinarias WHERE id = $1', [req.veterinaria.id]);
+        const result = await db.query('SELECT id, email, nombre, propietario, iniciales, telefono, direccion, logo_base64 AS logo FROM veterinarias WHERE id = $1', [req.veterinaria.id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Clínica no encontrada.' });
         }
@@ -292,23 +335,29 @@ app.get('/api/veterinaria', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/veterinaria', authMiddleware, async (req, res) => {
-    const { nombre, telefono, direccion, logo } = req.body;
+    const { nombre, propietario, telefono, direccion, logo } = req.body;
+    const propietarioLimpio = normalizarTextoPerfil(propietario);
     
     if (!nombre) {
         return res.status(400).json({ error: 'El nombre es obligatorio.' });
+    }
+
+    if (!propietarioLimpio) {
+        return res.status(400).json({ error: 'El nombre del propietario es obligatorio.' });
     }
     
     try {
         const queryText = `
             UPDATE veterinarias
-            SET nombre = $1, telefono = $2, direccion = $3, logo_base64 = $4
-            WHERE id = $5
-            RETURNING id, email, nombre, iniciales, telefono, direccion, logo_base64 AS logo
+            SET nombre = $1, propietario = $2, telefono = $3, direccion = $4, logo_base64 = $5
+            WHERE id = $6
+            RETURNING id, email, nombre, propietario, iniciales, telefono, direccion, logo_base64 AS logo
         `;
         // Subir logo a Storage si es Base64
         const logoFinal = await subirImagenAStorage(logo, 'logos');
-        const values = [nombre.trim(), telefono, direccion, logoFinal, req.veterinaria.id];
+        const values = [nombre.trim(), propietarioLimpio, telefono, direccion, logoFinal, req.veterinaria.id];
         const result = await db.query(queryText, values);
+        await sincronizarPropietarioConEquipo(req.veterinaria.id, propietarioLimpio);
         
         res.json({ mensaje: 'Perfil actualizado con éxito.', veterinaria: result.rows[0] });
     } catch (err) {
@@ -516,7 +565,21 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
         else if (espLower === "gato" || espLower === "felino") especieCodigo = "F";
         
         const fechaCodigo = formatearFechaAAMMDD(hoy);
-        const contadorStr = correlativo < 100 ? String(correlativo).padStart(2, "0") : String(correlativo);
+        const codigoPrefix = `CD-${req.veterinaria.iniciales.toUpperCase()}-${especieCodigo}-${fechaCodigo}-`;
+        const codigosRes = await db.query(
+            `SELECT codigo
+             FROM mascotas
+             WHERE veterinaria_id = $1
+               AND codigo LIKE $2
+             ORDER BY codigo DESC`,
+            [req.veterinaria.id, `${codigoPrefix}%`]
+        );
+        const mayorCorrelativo = codigosRes.rows.reduce((max, row) => {
+            const match = String(row.codigo || '').match(/-(\d+)$/);
+            const numero = match ? parseInt(match[1], 10) : 0;
+            return Number.isFinite(numero) && numero > max ? numero : max;
+        }, 0);
+        const contadorStr = String(Math.max(correlativo, mayorCorrelativo + 1)).padStart(3, "0");
         const codigoUnico = `CD-${req.veterinaria.iniciales.toUpperCase()}-${especieCodigo}-${fechaCodigo}-${contadorStr}`;
         
         // 3. Insertar mascota
@@ -573,6 +636,9 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
         });
     } catch (err) {
         console.error(err);
+        if (err.code === '23505') {
+            return res.status(409).json({ error: 'No se pudo generar un codigo unico para el paciente. Intenta guardar nuevamente.' });
+        }
         res.status(500).json({ error: 'Error al registrar la mascota.' });
     }
 });
@@ -1826,6 +1892,12 @@ app.post('/api/upload-image', authMiddleware, async (req, res) => {
 
 // --- INICIALIZACIÓN DEL SERVIDOR ---
 
-app.listen(PORT, () => {
+const serverInstance = app.listen(PORT, () => {
     console.log(`Servidor backend corriendo en puerto ${PORT}`);
 });
+
+serverInstance.on('error', (err) => {
+    console.error('Error al iniciar el servidor backend:', err.message);
+});
+
+setInterval(() => {}, 60 * 60 * 1000);

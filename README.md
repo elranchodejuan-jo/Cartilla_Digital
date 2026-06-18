@@ -48,7 +48,7 @@ La aplicación cuenta con una interfaz web responsiva de alta gama (estilo minim
 │   ├── schema.sql          # Estructura DDL de tablas y relaciones de la base de datos
 │   └── .env.template       # Plantilla de variables de entorno para el servidor
 ├── index.html              # Estructura base de la aplicación web
-└── iniciar_servidor.bat    # Script automatizado para arrancar el backend en Windows
+└── iniciar_servidor.bat    # Script automatizado para arrancar frontend y API en Windows
 ```
 
 ---
@@ -73,15 +73,21 @@ Crea una base de datos en Supabase y ejecuta las consultas del archivo `server/s
    ```
 4. Ejecuta `npm install` en la carpeta `server/` para instalar las dependencias (`pg`, `express`, `jsonwebtoken`, `dotenv`, etc.).
 
-### 3. Iniciar el Servidor
-En Windows, puedes hacer doble clic en el archivo `iniciar_servidor.bat` en la raíz del proyecto para encender automáticamente el backend. De forma alternativa, ejecuta:
+### 3. Iniciar Cartilla Digital
+En Windows, puedes hacer doble clic en el archivo `iniciar_servidor.bat` en la raíz del proyecto. Ese arranque abre `http://localhost:5500`, levanta el frontend y verifica que la API local esté activa en `http://localhost:3000`.
+
+De forma alternativa, ejecuta desde la raíz:
 ```bash
-cd server
 npm start
 ```
 
+Si solo necesitas levantar la API manualmente:
+```bash
+npm run backend
+```
+
 ### 4. Lanzar la Aplicación
-Dado que el frontend es Vanilla HTML/JS, puedes abrir directamente el archivo `index.html` en tu navegador favorito (o utilizar una extensión de servidor local como *Live Server* en VS Code).
+Abre `http://localhost:5500`. Para evitar errores al guardar pacientes, no abras `index.html` directamente si la API no está iniciada.
 
 ---
 

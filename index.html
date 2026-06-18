@@ -9,13 +9,21 @@
 </head>
 <body>
 
+    <button id="sidebar-toggle" class="sidebar-toggle no-print" type="button" aria-label="Abrir menu clinico">
+        <span></span><span></span><span></span>
+    </button>
+    <div id="sidebar-backdrop" class="sidebar-backdrop no-print" aria-hidden="true"></div>
+
     <!-- CABECERA PRINCIPAL (HEADER) - Oculta en Modo Público -->
-    <header class="header" role="banner">
+    <header class="header clinical-sidebar" role="banner">
         <div class="logo-container" id="brand-logo" role="button" aria-label="Volver al inicio">
             <img src="assets/logo-placeholder.png" alt="Logotipo Cartilla Digital" class="logo-img">
-            <h1 class="logo-text">Cartilla<span>Digital</span></h1>
+            <div class="logo-copy">
+                <h1 class="logo-text">Cartilla<span>Digital</span></h1>
+                <p class="sidebar-subtitle">Sistema clinico veterinario</p>
+            </div>
         </div>
-        <nav class="nav" role="navigation" aria-label="Menú principal de administración">
+        <nav class="nav sidebar-nav" role="navigation" aria-label="Menú principal de administración">
             <button class="nav-btn active" data-section="inicio" aria-current="page">
                 <span class="nav-icon">🏠</span>
                 <span class="nav-text">Inicio</span>
@@ -45,10 +53,6 @@
                 <span class="nav-text">Salir</span>
             </button>
         </nav>
-        <div class="header-actions">
-            <span id="api-env-indicator" class="api-env-indicator no-print"></span>
-            <button id="theme-toggle" class="btn-theme-toggle no-print" aria-label="Cambiar tema">🌙</button>
-        </div>
     </header>
 
     <!-- CONTENEDOR PRINCIPAL -->
@@ -95,6 +99,10 @@
                         <div class="form-group form-group-full">
                             <label for="reg-nombre">Nombre de la Veterinaria *</label>
                             <input type="text" id="reg-nombre" class="form-control" placeholder="Ej. Clínica Veterinaria San Francisco" required>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="reg-propietario">Nombre del Propietario *</label>
+                            <input type="text" id="reg-propietario" class="form-control" placeholder="Ej. Dra. Ana Martinez" required>
                         </div>
                         <div class="form-group">
                             <label for="reg-iniciales">Iniciales (2 a 5 letras) *</label>
@@ -236,6 +244,42 @@
                 <div class="section-header">
                     <h2 class="section-title">🔔 Próximos Vencimientos Médicos</h2>
                 </div>
+                <div class="dashboard-filters">
+                    <div class="filter-block">
+                        <span class="filter-label">Fecha</span>
+                        <div class="filter-group" role="group" aria-label="Filtrar proximas atenciones por fecha">
+                            <button class="filter-btn dashboard-range active" data-range="hoy">Hoy</button>
+                            <button class="filter-btn dashboard-range" data-range="manana">Manana</button>
+                            <button class="filter-btn dashboard-range" data-range="7">Proximos 7 dias</button>
+                            <button class="filter-btn dashboard-range" data-range="30">Proximo mes</button>
+                            <button class="filter-btn dashboard-range" data-range="custom">Rango personalizado</button>
+                        </div>
+                    </div>
+                    <div class="filter-block dashboard-custom-range" id="dashboard-custom-range" hidden>
+                        <label class="filter-label" for="dashboard-date-from">Desde</label>
+                        <input type="date" id="dashboard-date-from" class="form-control">
+                        <label class="filter-label" for="dashboard-date-to">Hasta</label>
+                        <input type="date" id="dashboard-date-to" class="form-control">
+                    </div>
+                    <div class="filter-block">
+                        <span class="filter-label">Tipo</span>
+                        <div class="filter-group" role="group" aria-label="Filtrar proximas atenciones por tipo">
+                            <button class="filter-btn dashboard-type active" data-type="todas">Todas</button>
+                            <button class="filter-btn dashboard-type" data-type="vacuna">Vacunas</button>
+                            <button class="filter-btn dashboard-type" data-type="desparasitacion-interna">Desparasitacion interna</button>
+                            <button class="filter-btn dashboard-type" data-type="desparasitacion-externa">Desparasitacion externa</button>
+                            <button class="filter-btn dashboard-type" data-type="control">Control preventivo</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="clinical-alerts-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Alertas clinicas</h2>
+                    </div>
+                    <div id="dashboard-alertas-clinicas" class="alerts-grid">
+                        <!-- Dinamico por JS -->
+                    </div>
+                </div>
                 <div id="dashboard-proximos-eventos">
                     <!-- Dinámico por JS -->
                     <div class="empty-state">
@@ -256,6 +300,10 @@
                         <div class="form-group form-group-full">
                             <label for="vet-nombre">Nombre de la Veterinaria *</label>
                             <input type="text" id="vet-nombre" class="form-control" placeholder="Ej. Veterinaria San José" required aria-required="true">
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="vet-propietario">Nombre del Propietario *</label>
+                            <input type="text" id="vet-propietario" class="form-control" placeholder="Ej. Dra. Ana Martinez" required aria-required="true">
                         </div>
                         <div class="form-group">
                             <label for="vet-iniciales">Iniciales para Código Único *</label>
@@ -282,6 +330,84 @@
                         <button type="submit" class="btn btn-primary">Guardar Configuración</button>
                     </div>
                 </form>
+                <div class="config-panels">
+                    <div class="config-panel" data-config-panel="equipo">
+                        <h3>Equipo veterinario</h3>
+                        <p>El equipo se administra desde Configuraciones y se usa como responsable en vacunas, desparasitaciones y controles.</p>
+                        <button type="button" class="btn btn-secondary" onclick="navegarA('equipo')">Gestionar equipo veterinario</button>
+                    </div>
+                    <div class="config-panel" data-config-panel="cargos">
+                        <h3>Cargos y especialidades</h3>
+                        <div class="quick-code-grid">
+                            <span><strong>Medico veterinario</strong> MV.</span>
+                            <span><strong>Doctor</strong> Dr.</span>
+                            <span><strong>Doctora</strong> Dra.</span>
+                            <span><strong>Auxiliar veterinario</strong> Aux.</span>
+                            <span><strong>Ayudante</strong> Ayud.</span>
+                            <span><strong>Administrador</strong> Admin.</span>
+                            <span><strong>Recepcionista</strong> Recep.</span>
+                            <span><strong>Groomer</strong> Groomer</span>
+                            <span><strong>Pasante</strong> Pas.</span>
+                            <span><strong>Especialista</strong> Esp.</span>
+                        </div>
+                    </div>
+                    <div class="config-panel" data-config-panel="plantillas">
+                        <h3>Plantillas de mensajes</h3>
+                        <div class="form-grid">
+                            <div class="form-group form-group-full">
+                                <label>Recordatorio de vacunas</label>
+                                <textarea class="form-control">Hola {{tutor}}, le recordamos que {{mascota}} tiene una vacuna pendiente para el dia {{fecha}}. Atentamente, {{veterinaria}}.</textarea>
+                            </div>
+                            <div class="form-group form-group-full">
+                                <label>Recordatorio de desparasitacion</label>
+                                <textarea class="form-control">Hola {{tutor}}, su mascota {{mascota}} tiene proxima desparasitacion el dia {{fecha}}. Atentamente, {{veterinaria}}.</textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-panel" data-config-panel="preferencias">
+                        <h3>Preferencias del sistema</h3>
+                        <div class="preferences-grid">
+                            <label><input type="checkbox" checked disabled> Formato de fecha DD/MM/AAAA</label>
+                            <label><input type="checkbox" checked disabled> Moneda USD</label>
+                            <label><input type="checkbox" checked> Mostrar logo en cartilla publica</label>
+                            <label><input type="checkbox"> Activar recordatorios por correo</label>
+                            <label><input type="checkbox"> Preparar WhatsApp futuro</label>
+                            <label><input type="checkbox" checked> Permitir QR publico</label>
+                        </div>
+                    </div>
+                    <div class="config-panel" data-config-panel="seguridad">
+                        <h3>Seguridad</h3>
+                        <div class="prepared-actions">
+                            <button type="button" class="btn btn-secondary" onclick="navegarA('forgotPassword')">Recuperar cuenta</button>
+                            <button type="button" class="btn btn-danger" onclick="cerrarSesionClinica()">Cerrar sesion</button>
+                        </div>
+                        <p class="prepared-note">Cambio de contrasena con sesion activa queda preparado para endpoint futuro.</p>
+                    </div>
+                    <div class="config-panel" data-config-panel="roles">
+                        <h3>Roles y permisos</h3>
+                        <div class="catalog-grid">
+                            <div class="catalog-card"><strong>Propietario</strong><span>Acceso total.</span></div>
+                            <div class="catalog-card"><strong>Medico veterinario</strong><span>Gestion clinica preventiva.</span></div>
+                            <div class="catalog-card"><strong>Auxiliar</strong><span>Apoyo en registros preventivos.</span></div>
+                            <div class="catalog-card"><strong>Recepcionista</strong><span>Pacientes y citas.</span></div>
+                            <div class="catalog-card"><strong>Administrador</strong><span>Banco y configuracion operativa.</span></div>
+                        </div>
+                    </div>
+                    <div class="config-panel theme-config-panel" data-config-panel="tema">
+                        <h3>Apariencia</h3>
+                        <div class="theme-setting-row">
+                            <div>
+                                <strong>Tema de la interfaz</strong>
+                                <p class="prepared-note">Cambia entre modo claro y oscuro.</p>
+                            </div>
+                            <button id="theme-toggle" class="theme-switch no-print" type="button" aria-label="Cambiar tema" aria-pressed="false">
+                                <span class="theme-switch-option theme-sun" aria-hidden="true">☀️</span>
+                                <span class="theme-switch-option theme-moon" aria-hidden="true">🌙</span>
+                                <span class="theme-switch-thumb" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -293,6 +419,9 @@
                     <h1 id="banco-title">🏦 Banco Clínico</h1>
                     <p>Configura vacunas y antiparasitarios recurrentes para autocompletar</p>
                 </div>
+                <button class="btn btn-primary" type="button" onclick="cargarCatalogoEcuador()">
+                    Cargar catalogo Ecuador
+                </button>
             </div>
 
             <!-- Subpestañas del Banco -->
@@ -301,6 +430,8 @@
                     <button class="filter-btn active" id="btn-tab-banco-vacunas" onclick="cambiarPestañaBanco('vacunas')">💉 Vacunas</button>
                     <button class="filter-btn" id="btn-tab-banco-internos" onclick="cambiarPestañaBanco('internos')">🪱 Antiparasitarios Internos</button>
                     <button class="filter-btn" id="btn-tab-banco-externos" onclick="cambiarPestañaBanco('externos')">🕷️ Antiparasitarios Externos</button>
+                    <button class="filter-btn" id="btn-tab-banco-medicamentos" onclick="cambiarPestañaBanco('medicamentos')">Medicamentos preventivos</button>
+                    <button class="filter-btn" id="btn-tab-banco-codigos" onclick="cambiarPestañaBanco('codigos')">Codigos rapidos</button>
                 </div>
             </div>
 
@@ -391,6 +522,39 @@
                         </div>
                     </div>
                 </div>
+                <div id="banco-tab-content-medicamentos" class="banco-tab-pane">
+                    <div class="clinical-section">
+                        <div class="section-header">
+                            <h3 class="section-title">Medicamentos preventivos</h3>
+                        </div>
+                        <div class="catalog-grid">
+                            <div class="catalog-card"><strong>Vitaminas</strong><span>Preparado para suplementos y refuerzos nutricionales.</span></div>
+                            <div class="catalog-card"><strong>Suplementos</strong><span>Registro futuro por especie, dosis y frecuencia.</span></div>
+                            <div class="catalog-card"><strong>Probioticos</strong><span>Control preventivo gastrointestinal.</span></div>
+                            <div class="catalog-card"><strong>Protectores</strong><span>Opciones dermatologicas y digestivas.</span></div>
+                            <div class="catalog-card"><strong>Dermatologicos preventivos</strong><span>Shampoo, spray y productos de mantenimiento.</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="banco-tab-content-codigos" class="banco-tab-pane">
+                    <div class="clinical-section">
+                        <div class="section-header">
+                            <h3 class="section-title">Codigos rapidos</h3>
+                        </div>
+                        <div class="quick-code-grid">
+                            <span><strong>v001</strong> vacuna</span>
+                            <span><strong>di001</strong> desparasitante interno</span>
+                            <span><strong>de001</strong> antiparasitario externo</span>
+                            <span><strong>r105</strong> raza mestizo</span>
+                            <span><strong>c</strong> Canino</span>
+                            <span><strong>f</strong> Felino</span>
+                            <span><strong>m</strong> Macho</span>
+                            <span><strong>h</strong> Hembra</span>
+                            <span><strong>s</strong> Si esterilizado</span>
+                            <span><strong>n</strong> No esterilizado</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -427,7 +591,13 @@
         <section id="section-registrar-mascota" class="app-section" aria-labelledby="pet-form-title">
             <div class="form-card">
                 <h2 id="pet-form-title" class="form-title">Registrar Nueva Mascota</h2>
-                <form id="form-mascota">
+                <div class="module-tabs" role="tablist" aria-label="Opciones de registro">
+                    <button class="filter-btn register-tab active" data-register-view="mascota" type="button">Registrar mascota</button>
+                    <button class="filter-btn register-tab" data-register-view="rapido" type="button">Registro rapido</button>
+                    <button class="filter-btn register-tab" data-register-view="preventiva" type="button">Atencion preventiva</button>
+                    <button class="filter-btn register-tab" data-register-view="importar" type="button">Importar pacientes</button>
+                </div>
+                <form id="form-mascota" class="register-panel active" data-register-panel="mascota">
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="pet-nombre">Nombre de la Mascota *</label>
@@ -511,6 +681,35 @@
                         <button type="submit" class="btn btn-primary">Guardar Paciente</button>
                     </div>
                 </form>
+                <div class="register-panel prepared-panel" data-register-panel="rapido">
+                    <h3>Registro rapido para campanas</h3>
+                    <div class="form-grid">
+                        <div class="form-group"><label>Tutor</label><input class="form-control" type="text" placeholder="Nombre del tutor"></div>
+                        <div class="form-group"><label>Telefono</label><input class="form-control" type="tel" placeholder="Telefono de contacto"></div>
+                        <div class="form-group"><label>Mascota</label><input class="form-control" type="text" placeholder="Nombre de la mascota"></div>
+                        <div class="form-group"><label>Especie</label><select class="form-control"><option>Canino</option><option>Felino</option></select></div>
+                        <div class="form-group"><label>Sexo</label><select class="form-control"><option>Macho</option><option>Hembra</option></select></div>
+                        <div class="form-group"><label>Raza</label><input class="form-control" type="text" placeholder="Raza o mestizo"></div>
+                        <div class="form-group form-group-full"><label>Vacuna o desparasitacion aplicada</label><input class="form-control" type="text" placeholder="Producto aplicado"></div>
+                        <div class="form-group"><label>Fecha de proxima atencion</label><input class="form-control" type="date"></div>
+                    </div>
+                    <p class="prepared-note">Preparado para guardar en lote cuando se habilite la tabla/carga masiva correspondiente.</p>
+                </div>
+                <div class="register-panel prepared-panel" data-register-panel="preventiva">
+                    <h3>Registrar atencion preventiva</h3>
+                    <div class="prepared-actions">
+                        <button type="button" class="btn btn-secondary" onclick="navegarA('pacientes')">Seleccionar paciente</button>
+                        <button type="button" class="btn btn-primary" onclick="navegarA('banco')">Consultar banco clinico</button>
+                    </div>
+                    <p class="prepared-note">Las vacunas, desparasitaciones internas, externas y controles se registran desde la cartilla del paciente usando responsables del equipo veterinario.</p>
+                </div>
+                <div class="register-panel prepared-panel" data-register-panel="importar">
+                    <h3>Importar pacientes</h3>
+                    <div class="import-dropzone">
+                        <strong>Plantilla Excel pendiente</strong>
+                        <span>Diseno listo para carga futura desde .xlsx o .csv sin mezclar datos manuales.</span>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -1064,11 +1263,44 @@
                     <div class="form-grid">
                         <div class="form-group form-group-full">
                             <label for="eq-nombre">Nombre Completo *</label>
-                            <input type="text" id="eq-nombre" class="form-control" placeholder="Ej. Dr. Carlos Soto" required>
+                            <input type="text" id="eq-nombre" class="form-control" placeholder="Ej. Carlos Soto" required>
                         </div>
                         <div class="form-group form-group-full">
-                            <label for="eq-cargo">Cargo / Especialidad *</label>
-                            <input type="text" id="eq-cargo" class="form-control" placeholder="Ej. Médico Veterinario" required>
+                            <label for="eq-cargo">Cargo *</label>
+                            <select id="eq-cargo" class="form-control" required>
+                                <option value="Medico veterinario">Medico veterinario</option>
+                                <option value="Doctor">Doctor</option>
+                                <option value="Doctora">Doctora</option>
+                                <option value="Auxiliar veterinario">Auxiliar veterinario</option>
+                                <option value="Ayudante">Ayudante</option>
+                                <option value="Administrador">Administrador</option>
+                                <option value="Recepcionista">Recepcionista</option>
+                                <option value="Groomer">Groomer</option>
+                                <option value="Pasante">Pasante</option>
+                                <option value="Especialista">Especialista</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label for="eq-especialidad">Especialidad</label>
+                            <select id="eq-especialidad" class="form-control">
+                                <option>Medicina general</option>
+                                <option>Medicina preventiva</option>
+                                <option>Cirugia</option>
+                                <option>Dermatologia</option>
+                                <option>Reproduccion</option>
+                                <option>Odontologia</option>
+                                <option>Anestesia</option>
+                                <option>Imagenologia</option>
+                                <option>Laboratorio</option>
+                                <option>Peluqueria / grooming</option>
+                                <option>Atencion al cliente</option>
+                                <option>Administracion</option>
+                                <option>Otro</option>
+                            </select>
+                        </div>
+                        <div class="form-group form-group-full">
+                            <label>Nombre profesional</label>
+                            <div id="eq-profesional-preview" class="professional-preview">MV. Nombre Apellido</div>
                         </div>
                         <div class="form-group form-group-full" id="eq-estado-group" style="display:none;">
                             <label for="eq-estado">Estado</label>

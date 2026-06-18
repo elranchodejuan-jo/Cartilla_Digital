@@ -4,6 +4,9 @@ async function migrate() {
     console.log("Iniciando migración de la base de datos...");
     
     try {
+        await db.query(`ALTER TABLE veterinarias ADD COLUMN IF NOT EXISTS propietario VARCHAR(150);`);
+        console.log("Columna propietario agregada a veterinarias o ya existia.");
+
         // 1. Tabla equipo_veterinario
         await db.query(`
             CREATE TABLE IF NOT EXISTS equipo_veterinario (

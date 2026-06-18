@@ -19,6 +19,11 @@ const UIState = {
     mascotaEdicionId: null,
     filtroEspecie: 'todos',
     busquedaQuery: '',
+    dashboardRange: 'hoy',
+    dashboardTipo: 'todas',
+    dashboardCustomFrom: '',
+    dashboardCustomTo: '',
+    registerView: 'mascota',
     logoBase64: '',
     fotoMascotaBase64: '',
     modoPublico: false // Si es true, oculta navegación y formularios
@@ -84,6 +89,10 @@ const DOM = {
  * Inicializa los controladores de la interfaz y configura los filtros.
  */
 function inicializarUI() {
+    configurarSidebarClinico();
+    configurarFiltrosDashboard();
+    configurarVistasRegistro();
+
     // Eventos de navegación SPA
     DOM.navButtons.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -109,8 +118,11 @@ function inicializarUI() {
     
     // Filtros por especie
     DOM.filterButtons.forEach(btn => {
+        if (!btn.dataset.specie) return;
         btn.addEventListener('click', () => {
-            DOM.filterButtons.forEach(b => b.classList.remove('active'));
+            DOM.filterButtons.forEach(b => {
+                if (b.dataset.specie) b.classList.remove('active');
+            });
             btn.classList.add('active');
             UIState.filtroEspecie = btn.dataset.specie;
             renderizarListadoPacientes();
@@ -120,17 +132,19 @@ function inicializarUI() {
     // Configurar Modo Oscuro / Claro
     const themeToggleBtn = document.getElementById('theme-toggle');
     if (themeToggleBtn) {
-        const esOscuro = document.body.classList.contains('dark-theme');
-        themeToggleBtn.textContent = esOscuro ? '☀️' : '🌙';
-        themeToggleBtn.title = esOscuro ? 'Activar Modo Claro' : 'Activar Modo Oscuro';
+        const sincronizarSwitchTema = () => {
+            const esOscuro = document.body.classList.contains('dark-theme');
+            themeToggleBtn.classList.toggle('is-dark', esOscuro);
+            themeToggleBtn.setAttribute('aria-pressed', String(!esOscuro));
+            themeToggleBtn.title = esOscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
+        };
+        sincronizarSwitchTema();
         
         themeToggleBtn.addEventListener('click', () => {
             document.body.classList.toggle('dark-theme');
             const nuevoEsOscuro = document.body.classList.contains('dark-theme');
-            themeToggleBtn.textContent = nuevoEsOscuro ? '☀️' : '🌙';
-            themeToggleBtn.title = nuevoEsOscuro ? 'Activar Modo Claro' : 'Activar Modo Oscuro';
             localStorage.setItem('cartilla_digital_theme', nuevoEsOscuro ? 'dark' : 'light');
-            mostrarToast(nuevoEsOscuro ? 'Modo Oscuro activado' : 'Modo Claro activado', 'info');
+            sincronizarSwitchTema();
         });
     }
     
@@ -142,6 +156,155 @@ function inicializarUI() {
  * Activa o desactiva el Modo Vista Pública.
  * @param {boolean} activar - True para activar la restricción
  */
+function configurarSidebarClinico() {
+    const nav = document.querySelector('.sidebar-nav');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (!nav) return;
+
+    const submenuConfig = {
+        pacientes: [
+            ['Todos los pacientes', { patientFilter: 'todos' }],
+            ['Caninos', { patientFilter: 'canino' }],
+            ['Felinos', { patientFilter: 'felino' }],
+            ['Buscar paciente', { focusSearch: true }],
+            ['Pacientes con alertas', { patientFilter: 'alertas' }]
+        ],
+        registrarMascota: [
+            ['Registrar mascota', { registerView: 'mascota' }],
+            ['Registro rapido', { registerView: 'rapido' }],
+            ['Registrar atencion preventiva', { registerView: 'preventiva' }],
+            ['Importar pacientes', { registerView: 'importar' }]
+        ],
+        banco: [
+            ['Vacunas', { bancoTab: 'vacunas' }],
+            ['Antiparasitarios internos', { bancoTab: 'internos' }],
+            ['Antiparasitarios externos', { bancoTab: 'externos' }],
+            ['Medicamentos preventivos', { bancoTab: 'medicamentos' }],
+            ['Codigos rapidos', { bancoTab: 'codigos' }]
+        ],
+        configuracion: [
+            ['Datos de la veterinaria', { configTab: 'datos' }],
+            ['Equipo veterinario', { section: 'equipo' }],
+            ['Cargos y especialidades', { configTab: 'cargos' }],
+            ['Plantillas de mensajes', { configTab: 'plantillas' }],
+            ['Preferencias del sistema', { configTab: 'preferencias' }],
+            ['Seguridad', { configTab: 'seguridad' }],
+            ['Roles y permisos', { configTab: 'roles' }],
+            ['Apariencia', { configTab: 'tema' }]
+        ]
+    };
+
+    Object.keys(submenuConfig).forEach(section => {
+        const btn = nav.querySelector(`.nav-btn[data-section="${section}"]`);
+        if (!btn || btn.closest('.nav-group')) return;
+        const group = document.createElement('div');
+        group.className = `nav-group ${section === 'pacientes' ? 'open' : ''}`;
+        btn.classList.add('nav-parent');
+        btn.insertAdjacentHTML('beforeend', '<span class="nav-caret">⌄</span>');
+        btn.parentNode.insertBefore(group, btn);
+        group.appendChild(btn);
+        const submenu = document.createElement('div');
+        submenu.className = 'nav-submenu';
+        submenuConfig[section].forEach(([label, action]) => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'nav-subitem';
+            item.textContent = label;
+            item.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const destino = action.section || section;
+                if (action.patientFilter) UIState.filtroEspecie = action.patientFilter;
+                if (action.registerView) UIState.registerView = action.registerView;
+                if (action.bancoTab && typeof cambiarPestañaBanco === 'function') bancoPestañaActiva = action.bancoTab;
+                await navegarA(destino);
+                if (action.bancoTab && typeof cambiarPestañaBanco === 'function') cambiarPestañaBanco(action.bancoTab);
+                if (action.registerView) cambiarVistaRegistro(action.registerView);
+                if (action.configTab) activarPanelConfiguracion(action.configTab);
+                if (action.focusSearch) {
+                    const search = document.getElementById('search-bar');
+                    if (search) search.focus();
+                }
+                cerrarSidebarMovil();
+            });
+            submenu.appendChild(item);
+        });
+        group.appendChild(submenu);
+    });
+
+    const equipoMain = nav.querySelector('.nav-btn[data-section="equipo"]');
+    if (equipoMain) equipoMain.classList.add('nav-hidden-main');
+    const configText = nav.querySelector('.nav-btn[data-section="configuracion"] .nav-text');
+    if (configText) configText.textContent = 'Configuraciones';
+
+    nav.querySelectorAll('.nav-parent').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const group = btn.closest('.nav-group');
+            if (group) group.classList.toggle('open');
+        });
+    });
+
+    window.cerrarSidebarMovil = function() {
+        document.body.classList.remove('sidebar-open');
+    };
+    if (sidebarToggle) sidebarToggle.addEventListener('click', () => document.body.classList.add('sidebar-open'));
+    if (backdrop) backdrop.addEventListener('click', window.cerrarSidebarMovil);
+}
+
+function configurarFiltrosDashboard() {
+    document.querySelectorAll('.dashboard-range').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.dashboard-range').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            UIState.dashboardRange = btn.dataset.range;
+            const custom = document.getElementById('dashboard-custom-range');
+            if (custom) custom.hidden = UIState.dashboardRange !== 'custom';
+            renderizarDashboardClinico();
+        });
+    });
+    document.querySelectorAll('.dashboard-type').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.dashboard-type').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            UIState.dashboardTipo = btn.dataset.type;
+            renderizarDashboardClinico();
+        });
+    });
+    ['dashboard-date-from', 'dashboard-date-to'].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.addEventListener('change', () => {
+            UIState.dashboardCustomFrom = document.getElementById('dashboard-date-from')?.value || '';
+            UIState.dashboardCustomTo = document.getElementById('dashboard-date-to')?.value || '';
+            renderizarDashboardClinico();
+        });
+    });
+}
+
+function configurarVistasRegistro() {
+    document.querySelectorAll('.register-tab').forEach(btn => {
+        btn.addEventListener('click', () => cambiarVistaRegistro(btn.dataset.registerView));
+    });
+}
+
+function cambiarVistaRegistro(view = 'mascota') {
+    UIState.registerView = view;
+    document.querySelectorAll('.register-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.registerView === view);
+    });
+    document.querySelectorAll('.register-panel').forEach(panel => {
+        panel.classList.toggle('active', panel.dataset.registerPanel === view);
+    });
+}
+
+function activarPanelConfiguracion(tab = 'datos') {
+    document.querySelectorAll('.config-panel').forEach(panel => {
+        panel.classList.toggle('highlight-panel', panel.dataset.configPanel === tab);
+    });
+    const target = document.querySelector(`[data-config-panel="${tab}"]`);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function configurarModoPublico(activar) {
     UIState.modoPublico = activar;
     if (activar) {
@@ -193,17 +356,24 @@ async function navegarA(seccionId) {
     
     // Ejecutar lógica por sección
     if (seccionId === 'inicio') {
-        await renderizarDashboard();
+        await renderizarDashboardClinico();
     } else if (seccionId === 'pacientes') {
         await renderizarListadoPacientes();
     } else if (seccionId === 'configuracion') {
         cargarDatosFormVeterinaria();
+        activarPanelConfiguracion('datos');
+    } else if (seccionId === 'equipo') {
+        if (typeof cargarEquipoVeterinario === 'function') {
+            await cargarEquipoVeterinario();
+        }
     } else if (seccionId === 'registrarMascota') {
         await prepararFormularioMascota();
+        cambiarVistaRegistro(UIState.registerView || 'mascota');
     } else if (seccionId === 'banco') {
         cambiarPestañaBanco(bancoPestañaActiva);
     }
     
+    if (typeof cerrarSidebarMovil === 'function') cerrarSidebarMovil();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -328,6 +498,7 @@ function cargarDatosFormVeterinaria() {
     const vet = obtenerVeterinaria();
     if (vet) {
         document.getElementById('vet-nombre').value = vet.nombre || '';
+        document.getElementById('vet-propietario').value = vet.propietario || '';
         document.getElementById('vet-iniciales').value = vet.iniciales || '';
         document.getElementById('vet-telefono').value = vet.telefono || '';
         document.getElementById('vet-direccion').value = vet.direccion || '';
@@ -600,13 +771,236 @@ async function renderizarDashboard() {
 /**
  * Renderiza listado de pacientes con filtros y búsquedas
  */
+async function renderizarDashboardClinico() {
+    const mascotas = await obtenerMascotas();
+    const eventos = construirEventosPreventivos(mascotas);
+    const total = mascotas.length;
+    const perros = mascotas.filter(m => ['perro', 'canino', 'p'].includes((m.especie || '').toLowerCase())).length;
+    const gatos = mascotas.filter(m => ['gato', 'felino', 'g'].includes((m.especie || '').toLowerCase())).length;
+    const hoy = fechaISO(new Date());
+    const en30 = fechaISO(sumarDias(new Date(), 30));
+    const vacunasProximas = eventos.filter(e => e.categoria === 'vacuna' && e.fecha >= hoy && e.fecha <= en30 && e.estado !== 'asistio').length;
+    const desparasitacionesProximas = eventos.filter(e => e.categoria === 'desparasitacion' && e.fecha >= hoy && e.fecha <= en30 && e.estado !== 'asistio').length;
+
+    DOM.stats.total.textContent = total;
+    DOM.stats.perros.textContent = perros;
+    DOM.stats.gatos.textContent = gatos;
+    DOM.stats.vacunas.textContent = vacunasProximas;
+    DOM.stats.desparasitaciones.textContent = desparasitacionesProximas;
+
+    const eventosFiltrados = filtrarEventosDashboard(eventos).sort((a, b) => a.diasRestantes - b.diasRestantes);
+    if (!DOM.proximosEventosContainer) return;
+
+    if (eventosFiltrados.length === 0) {
+        DOM.proximosEventosContainer.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">OK</div>
+                <p>No hay atenciones para los filtros seleccionados.</p>
+            </div>
+        `;
+    } else {
+        const rows = eventosFiltrados.map(e => {
+            const badge = e.diasRestantes < 0
+                ? `<span class="status-badge danger">Vencida (${Math.abs(e.diasRestantes)} d)</span>`
+                : e.diasRestantes === 0
+                    ? '<span class="status-badge warning">Hoy</span>'
+                    : `<span class="status-badge warning">En ${e.diasRestantes} dias</span>`;
+            return `
+                <tr style="cursor: pointer;" onclick="verCartillaMascota('${e.mascotaId}')">
+                    <td data-label="Mascota"><strong>${e.mascota}</strong><br><small>${e.especie}</small></td>
+                    <td data-label="Tutor">${e.tutor || 'Sin tutor'}</td>
+                    <td data-label="Tipo"><span class="patient-badge ${e.categoria === 'vacuna' ? 'perro' : 'gato'}">${e.tipo}</span></td>
+                    <td data-label="Producto">${e.nombre}</td>
+                    <td data-label="Fecha">${formatearFechaLocal(e.fecha)}</td>
+                    <td data-label="Estado">${badge}</td>
+                    <td data-label="Acciones"><button class="btn btn-secondary btn-sm" type="button">Ver paciente</button></td>
+                </tr>
+            `;
+        }).join('');
+
+        DOM.proximosEventosContainer.innerHTML = `
+            <div class="table-container">
+                <table class="clinic-table">
+                    <thead>
+                        <tr>
+                            <th>Mascota</th>
+                            <th>Tutor</th>
+                            <th>Tipo de atencion</th>
+                            <th>Vacuna / antiparasitario</th>
+                            <th>Fecha proxima</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    renderizarAlertasClinicas(mascotas, eventos);
+}
+
+function construirEventosPreventivos(mascotas) {
+    const eventos = [];
+    mascotas.forEach(mascota => {
+        (mascota.vacunas || []).forEach(v => {
+            if (!v.proximaDosis) return;
+            const ev = obtenerEstadoPreventivoVisual(v.proximaDosis, v.status, evaluarEstadoVacuna);
+            eventos.push({
+                categoria: 'vacuna',
+                tipo: 'Vacuna',
+                nombre: v.nombre || 'Vacuna',
+                mascota: mascota.nombre,
+                especie: mapearEspecie(mascota.especie),
+                tutor: mascota.tutor?.nombre || '',
+                mascotaId: mascota.id,
+                fecha: v.proximaDosis,
+                diasRestantes: ev.daysLeft,
+                alerta: ev.status,
+                estado: v.status || 'pendiente'
+            });
+        });
+        (mascota.desparasitaciones || []).forEach(d => {
+            if (!d.proximaAplicacion) return;
+            const ed = obtenerEstadoPreventivoVisual(d.proximaAplicacion, d.status, evaluarEstadoDesparasitacion);
+            const interna = (d.tipo || '').toLowerCase() !== 'externa';
+            eventos.push({
+                categoria: 'desparasitacion',
+                subtipo: interna ? 'desparasitacion-interna' : 'desparasitacion-externa',
+                tipo: interna ? 'Desparasitacion interna' : 'Desparasitacion externa',
+                nombre: d.producto || 'Antiparasitario',
+                mascota: mascota.nombre,
+                especie: mapearEspecie(mascota.especie),
+                tutor: mascota.tutor?.nombre || '',
+                mascotaId: mascota.id,
+                fecha: d.proximaAplicacion,
+                diasRestantes: ed.daysLeft,
+                alerta: ed.status,
+                estado: d.status || 'pendiente'
+            });
+        });
+        (mascota.controles || []).forEach(c => {
+            if (!c.proximoControl) return;
+            const ec = evaluarEstadoDesparasitacion(c.proximoControl);
+            eventos.push({
+                categoria: 'control',
+                subtipo: 'control',
+                tipo: 'Control preventivo',
+                nombre: c.motivo || 'Control preventivo',
+                mascota: mascota.nombre,
+                especie: mapearEspecie(mascota.especie),
+                tutor: mascota.tutor?.nombre || '',
+                mascotaId: mascota.id,
+                fecha: c.proximoControl,
+                diasRestantes: ec.daysLeft,
+                alerta: ec.status,
+                estado: c.status || 'pendiente'
+            });
+        });
+    });
+    return eventos;
+}
+
+function filtrarEventosDashboard(eventos) {
+    const rango = obtenerRangoDashboard();
+    return eventos.filter(e => {
+        const tipo = UIState.dashboardTipo;
+        const coincideTipo = tipo === 'todas' ||
+            (tipo === 'vacuna' && e.categoria === 'vacuna') ||
+            (tipo === 'control' && e.categoria === 'control') ||
+            e.subtipo === tipo;
+        return coincideTipo && e.fecha >= rango.desde && e.fecha <= rango.hasta;
+    });
+}
+
+function obtenerRangoDashboard() {
+    const hoyDate = new Date();
+    hoyDate.setHours(0, 0, 0, 0);
+    let desde = hoyDate;
+    let hasta = hoyDate;
+    if (UIState.dashboardRange === 'manana') {
+        desde = sumarDias(hoyDate, 1);
+        hasta = sumarDias(hoyDate, 1);
+    } else if (UIState.dashboardRange === '7') {
+        hasta = sumarDias(hoyDate, 7);
+    } else if (UIState.dashboardRange === '30') {
+        hasta = sumarDias(hoyDate, 30);
+    } else if (UIState.dashboardRange === 'custom') {
+        return {
+            desde: UIState.dashboardCustomFrom || fechaISO(hoyDate),
+            hasta: UIState.dashboardCustomTo || fechaISO(sumarDias(hoyDate, 30))
+        };
+    }
+    return { desde: fechaISO(desde), hasta: fechaISO(hasta) };
+}
+
+function sumarDias(fecha, dias) {
+    const copia = new Date(fecha);
+    copia.setDate(copia.getDate() + dias);
+    return copia;
+}
+
+function fechaISO(fecha) {
+    return fecha.toISOString().split('T')[0];
+}
+
+function renderizarAlertasClinicas(mascotas, eventos) {
+    const container = document.getElementById('dashboard-alertas-clinicas');
+    if (!container) return;
+    const vacunasVencidas = eventos.filter(e => e.categoria === 'vacuna' && e.diasRestantes < 0).length;
+    const desparasitacionesVencidas = eventos.filter(e => e.categoria === 'desparasitacion' && e.diasRestantes < 0).length;
+    const pacientesSinTutorCompleto = mascotas.filter(m => !m.tutor?.nombre || !m.tutor?.telefono).length;
+    const tutoresSinTelefono = mascotas.filter(m => !m.tutor?.telefono).length;
+    const tutoresSinCorreo = mascotas.length;
+    const pacientesSinProximaCita = mascotas.filter(m => !tieneProximaAtencion(m)).length;
+    const incompletos = mascotas.filter(m => !m.nombre || !m.especie || !m.raza || !m.sexo || !m.fechaNacimiento || !m.tutor?.nombre).length;
+    const alertas = [
+        ['Vacunas vencidas', vacunasVencidas, 'danger'],
+        ['Desparasitaciones vencidas', desparasitacionesVencidas, 'danger'],
+        ['Pacientes sin tutor completo', pacientesSinTutorCompleto, 'warning'],
+        ['Tutores sin telefono', tutoresSinTelefono, 'warning'],
+        ['Tutores sin correo', tutoresSinCorreo, 'secondary'],
+        ['Pacientes sin proxima cita', pacientesSinProximaCita, 'warning'],
+        ['Pacientes con datos incompletos', incompletos, 'warning']
+    ];
+    container.innerHTML = alertas.map(([label, value, tone]) => `
+        <button class="alert-card ${tone}" type="button" onclick="UIState.filtroEspecie='alertas'; navegarA('pacientes')">
+            <span>${label}</span>
+            <strong>${value}</strong>
+        </button>
+    `).join('');
+}
+
+function tieneProximaAtencion(mascota) {
+    return (mascota.vacunas || []).some(v => v.proximaDosis) ||
+        (mascota.desparasitaciones || []).some(d => d.proximaAplicacion) ||
+        (mascota.controles || []).some(c => c.proximoControl);
+}
+
 async function renderizarListadoPacientes() {
     let mascotas = await obtenerMascotas();
     const query = UIState.busquedaQuery.toLowerCase().trim();
     const filtro = UIState.filtroEspecie.toLowerCase();
     
     if (filtro !== 'todos') {
-        mascotas = mascotas.filter(m => m.especie.toLowerCase() === filtro);
+        if (filtro === 'alertas') {
+            mascotas = mascotas.filter(m => {
+                const ind = obtenerIndicadoresPreventivos(m);
+                return ind.vacunasVencidas > 0 ||
+                    ind.desparasitacionVencida > 0 ||
+                    !m.tutor?.nombre ||
+                    !m.tutor?.telefono ||
+                    !tieneProximaAtencion(m);
+            });
+        } else {
+            mascotas = mascotas.filter(m => {
+                const esp = (m.especie || '').toLowerCase();
+                if (filtro === 'canino' || filtro === 'perro') return esp === 'canino' || esp === 'perro' || esp === 'p';
+                if (filtro === 'felino' || filtro === 'gato') return esp === 'felino' || esp === 'gato' || esp === 'g';
+                return esp === filtro;
+            });
+        }
     }
     
     if (query) {
@@ -614,6 +1008,8 @@ async function renderizarListadoPacientes() {
             return m.nombre.toLowerCase().includes(query) ||
                    m.tutor.nombre.toLowerCase().includes(query) ||
                    m.codigo.toLowerCase().includes(query) ||
+                   (m.tutor.telefono || '').toLowerCase().includes(query) ||
+                   (m.especie || '').toLowerCase().includes(query) ||
                    m.raza.toLowerCase().includes(query);
         });
     }
@@ -631,8 +1027,11 @@ async function renderizarListadoPacientes() {
         DOM.pacientesGrid.innerHTML = mascotas.map(mascota => {
             const edad = calcularEdadMascota(mascota.fechaNacimiento);
             const avatar = obtenerFotoMascota(mascota);
-            const especieClase = mascota.especie.toLowerCase() === 'perro' ? 'perro' : 'gato';
+            const especieNormalizada = (mascota.especie || '').toLowerCase();
+            const especieClase = especieNormalizada === 'perro' || especieNormalizada === 'canino' ? 'perro' : 'gato';
             const ind = obtenerIndicadoresPreventivos(mascota);
+            const proximaVacuna = obtenerProximaVacunaPaciente(mascota);
+            const proximaDesparasitacion = obtenerProximaDesparasitacionPaciente(mascota);
             
             let htmlAlertas = '';
             if (ind.vacunasVencidas > 0) {
@@ -678,8 +1077,20 @@ async function renderizarListadoPacientes() {
                             <span class="patient-meta-val">${edad}</span>
                         </div>
                         <div class="patient-meta-row">
+                            <span class="patient-meta-label">Sexo:</span>
+                            <span class="patient-meta-val">${mascota.sexo || 'N/A'}</span>
+                        </div>
+                        <div class="patient-meta-row">
                             <span class="patient-meta-label">Tutor:</span>
                             <span class="patient-meta-val">${mascota.tutor.nombre}</span>
+                        </div>
+                        <div class="patient-meta-row">
+                            <span class="patient-meta-label">PrÃ³xima vacuna:</span>
+                            <span class="patient-meta-val">${proximaVacuna ? formatearFechaLocal(proximaVacuna) : 'Sin programar'}</span>
+                        </div>
+                        <div class="patient-meta-row">
+                            <span class="patient-meta-label">PrÃ³xima desparasitaciÃ³n:</span>
+                            <span class="patient-meta-val">${proximaDesparasitacion ? formatearFechaLocal(proximaDesparasitacion) : 'Sin programar'}</span>
                         </div>
                         <div class="patient-meta-row" style="margin-top: 10px; flex-wrap: wrap; gap: 6px; justify-content: flex-start;">
                             ${htmlAlertas}
@@ -699,6 +1110,20 @@ async function renderizarListadoPacientes() {
 /**
  * Carga la edición de la mascota
  */
+function obtenerProximaVacunaPaciente(mascota) {
+    return (mascota.vacunas || [])
+        .map(v => v.proximaDosis)
+        .filter(Boolean)
+        .sort()[0] || '';
+}
+
+function obtenerProximaDesparasitacionPaciente(mascota) {
+    return (mascota.desparasitaciones || [])
+        .map(d => d.proximaAplicacion)
+        .filter(Boolean)
+        .sort()[0] || '';
+}
+
 async function prepararEdicionMascota(id) {
     const mascotas = await obtenerMascotas();
     const mascota = mascotas.find(m => m.id === id);

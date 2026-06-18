@@ -166,14 +166,15 @@ function configurarManejadoresFormularios() {
         formRegistroClinica.addEventListener('submit', async (e) => {
             e.preventDefault();
             const nombre = document.getElementById('reg-nombre').value.trim();
+            const propietario = document.getElementById('reg-propietario').value.trim();
             const iniciales = document.getElementById('reg-iniciales').value.trim().toUpperCase();
             const email = document.getElementById('reg-email').value.trim();
             const password = document.getElementById('reg-password').value;
             const telefono = document.getElementById('reg-telefono').value.trim();
             const direccion = document.getElementById('reg-direccion').value.trim();
             
-            if (!nombre || !iniciales || !email || !password) {
-                mostrarToast('El nombre, iniciales, correo y contraseña son obligatorios.', 'error');
+            if (!nombre || !propietario || !iniciales || !email || !password) {
+                mostrarToast('El nombre, propietario, iniciales, correo y contraseña son obligatorios.', 'error');
                 return;
             }
             
@@ -184,6 +185,7 @@ function configurarManejadoresFormularios() {
             
             const datos = {
                 nombre,
+                propietario,
                 iniciales,
                 email,
                 password,
@@ -217,6 +219,7 @@ function configurarManejadoresFormularios() {
             e.preventDefault();
             
             const nombre = document.getElementById('vet-nombre').value.trim();
+            const propietario = document.getElementById('vet-propietario').value.trim();
             const telefono = document.getElementById('vet-telefono').value.trim();
             const direccion = document.getElementById('vet-direccion').value.trim();
             
@@ -224,9 +227,15 @@ function configurarManejadoresFormularios() {
                 mostrarToast('El nombre de la veterinaria es requerido.', 'error');
                 return;
             }
+
+            if (!propietario) {
+                mostrarToast('El nombre del propietario es requerido.', 'error');
+                return;
+            }
             
             const datos = {
                 nombre,
+                propietario,
                 telefono,
                 direccion,
                 logo: UIState.logoBase64
@@ -236,6 +245,9 @@ function configurarManejadoresFormularios() {
                 mostrarToast('Actualizando configuración...', 'info');
                 const res = await guardarVeterinaria(datos);
                 if (res) {
+                    if (typeof cargarEquipoVeterinario === 'function') {
+                        await cargarEquipoVeterinario();
+                    }
                     formularioModificado = false;
                     mostrarToast('Configuración guardada correctamente.', 'success');
                     navegarA('inicio');

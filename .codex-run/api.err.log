@@ -1,0 +1,5 @@
+Modulo @supabase/supabase-js no disponible. Las imagenes se guardaran como Base64 en la BD.
+Supabase Storage no configurado. Las imagenes se guardaran como Base64 en la BD.
+⚠️  Módulo Resend no disponible: Cannot find module 'resend'
+Require stack:
+- C:\Users\ASUS\OneDrive\Escritorio\PROYECTOS\CARTILLA DIGITAL\server\index.js

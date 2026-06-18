@@ -10,6 +10,303 @@ let cacheVacunas = [];
 let cacheInternos = [];
 let cacheExternos = [];
 
+const CATALOGO_ECUADOR = {
+    vacunas: [
+        {
+            nombre: 'Nobivac Puppy DP',
+            tipo: 'Cachorros / viral',
+            especie: 'Canino',
+            enfermedades: 'Distemper canino y parvovirus canino',
+            laboratorio: 'MSD Animal Health',
+            lote: '',
+            frecuencia: 'Segun esquema veterinario; refuerzos de cachorro',
+            observaciones: 'Catalogo referencial Ecuador. Verificar etiqueta, disponibilidad y registro local antes de aplicar.'
+        },
+        {
+            nombre: 'Nobivac DHPPi / DAPPi',
+            tipo: 'Multiple canina',
+            especie: 'Canino',
+            enfermedades: 'Distemper, adenovirus/hepatitis, parvovirus y parainfluenza',
+            laboratorio: 'MSD Animal Health',
+            lote: '',
+            frecuencia: 'Refuerzo anual o segun criterio veterinario',
+            observaciones: 'Puede combinarse con leptospira segun presentacion. Verificar etiqueta del producto disponible.'
+        },
+        {
+            nombre: 'Vanguard Plus 5',
+            tipo: 'Multiple canina',
+            especie: 'Canino',
+            enfermedades: 'Distemper, adenovirus tipo 1 y 2, parainfluenza y parvovirus',
+            laboratorio: 'Zoetis',
+            lote: '',
+            frecuencia: 'Refuerzo anual o segun criterio veterinario',
+            observaciones: 'Catalogo referencial. Revisar cepas y cobertura segun presentacion importada.'
+        },
+        {
+            nombre: 'Vanguard Plus 5/L4',
+            tipo: 'Multiple canina + leptospira',
+            especie: 'Canino',
+            enfermedades: 'Componentes Vanguard Plus 5 y leptospirosis segun presentacion',
+            laboratorio: 'Zoetis',
+            lote: '',
+            frecuencia: 'Refuerzo anual o segun riesgo epidemiologico',
+            observaciones: 'Usar solo segun etiqueta y evaluacion clinica.'
+        },
+        {
+            nombre: 'Eurican DAPPi-L',
+            tipo: 'Multiple canina + leptospira',
+            especie: 'Canino',
+            enfermedades: 'Distemper, adenovirus, parvovirus, parainfluenza y leptospira',
+            laboratorio: 'Boehringer Ingelheim',
+            lote: '',
+            frecuencia: 'Refuerzo anual o segun criterio veterinario',
+            observaciones: 'Verificar presentacion exacta y cadena de frio.'
+        },
+        {
+            nombre: 'Canigen MHA2PPi/L',
+            tipo: 'Multiple canina + leptospira',
+            especie: 'Canino',
+            enfermedades: 'Moquillo, hepatitis/adenovirus, parvovirus, parainfluenza y leptospira',
+            laboratorio: 'Virbac',
+            lote: '',
+            frecuencia: 'Refuerzo anual o segun criterio veterinario',
+            observaciones: 'Catalogo referencial para banco clinico.'
+        },
+        {
+            nombre: 'Biocan DHPPi + L',
+            tipo: 'Multiple canina + leptospira',
+            especie: 'Canino',
+            enfermedades: 'Distemper, hepatitis/adenovirus, parvovirus, parainfluenza y leptospira',
+            laboratorio: 'Bioveta',
+            lote: '',
+            frecuencia: 'Refuerzo anual o segun criterio veterinario',
+            observaciones: 'Confirmar importador, lote y registro vigente.'
+        },
+        {
+            nombre: 'Antirrabica canina/felina',
+            tipo: 'Rabia',
+            especie: 'Ambos',
+            enfermedades: 'Rabia',
+            laboratorio: 'Varios',
+            lote: '',
+            frecuencia: 'Segun normativa local y criterio veterinario',
+            observaciones: 'Registrar lote, laboratorio y fecha real de aplicacion.'
+        },
+        {
+            nombre: 'Nobivac KC',
+            tipo: 'Respiratoria canina',
+            especie: 'Canino',
+            enfermedades: 'Bordetella bronchiseptica y parainfluenza canina segun presentacion',
+            laboratorio: 'MSD Animal Health',
+            lote: '',
+            frecuencia: 'Segun riesgo: hospedaje, guarderia, exposiciones',
+            observaciones: 'Confirmar via de administracion de la presentacion disponible.'
+        },
+        {
+            nombre: 'Nobivac Tricat Trio',
+            tipo: 'Triple felina',
+            especie: 'Felino',
+            enfermedades: 'Rinotraqueitis viral felina, calicivirus y panleucopenia',
+            laboratorio: 'MSD Animal Health',
+            lote: '',
+            frecuencia: 'Refuerzo anual o segun criterio veterinario',
+            observaciones: 'Catalogo referencial. Verificar edad minima y esquema.'
+        },
+        {
+            nombre: 'Purevax RCP',
+            tipo: 'Triple felina',
+            especie: 'Felino',
+            enfermedades: 'Rinotraqueitis, calicivirus y panleucopenia felina',
+            laboratorio: 'Boehringer Ingelheim',
+            lote: '',
+            frecuencia: 'Refuerzo anual o segun criterio veterinario',
+            observaciones: 'Confirmar disponibilidad y presentacion local.'
+        },
+        {
+            nombre: 'Purevax FeLV / Leucemia felina',
+            tipo: 'Leucemia felina',
+            especie: 'Felino',
+            enfermedades: 'Virus de leucemia felina',
+            laboratorio: 'Boehringer Ingelheim',
+            lote: '',
+            frecuencia: 'Segun test, riesgo y criterio veterinario',
+            observaciones: 'Recomendado registrar prueba FeLV/FIV previa cuando aplique.'
+        }
+    ],
+    internos: [
+        {
+            nombre: 'Relampago',
+            principioActivo: 'Por confirmar segun etiqueta',
+            especie: 'Ambos',
+            presentacion: 'Tableta / suspension segun distribuidor',
+            dosisRecomendada: 'Segun peso y etiqueta del producto',
+            rangoPeso: 'Por presentacion',
+            viaAdministracion: 'Oral',
+            frecuenciaRecomendada: 'Cada 3 meses o segun plan preventivo',
+            parasitosCubre: 'Verificar espectro en etiqueta',
+            laboratorio: 'Por confirmar',
+            lote: '',
+            observaciones: 'Producto indicado por el usuario. Completar principio activo al revisar envase o ficha tecnica local.'
+        },
+        {
+            nombre: 'Total Full',
+            principioActivo: 'Por confirmar segun etiqueta',
+            especie: 'Ambos',
+            presentacion: 'Tableta / suspension segun distribuidor',
+            dosisRecomendada: 'Segun peso y etiqueta del producto',
+            rangoPeso: 'Por presentacion',
+            viaAdministracion: 'Oral',
+            frecuenciaRecomendada: 'Cada 3 meses o segun plan preventivo',
+            parasitosCubre: 'Verificar espectro en etiqueta',
+            laboratorio: 'Por confirmar',
+            lote: '',
+            observaciones: 'Tambien puede encontrarse escrito como Totalfull. Confirmar composicion antes de usar.'
+        },
+        {
+            nombre: 'Pirantel',
+            principioActivo: 'Pamoato de pirantel',
+            especie: 'Ambos',
+            presentacion: 'Suspension / tableta',
+            dosisRecomendada: 'Segun peso, especie y etiqueta',
+            rangoPeso: 'Cachorros, adultos; ajustar por presentacion',
+            viaAdministracion: 'Oral',
+            frecuenciaRecomendada: 'Segun edad, riesgo y plan preventivo',
+            parasitosCubre: 'Nematodos gastrointestinales sensibles',
+            laboratorio: 'Varios',
+            lote: '',
+            observaciones: 'Registrar concentracion exacta del producto usado.'
+        },
+        {
+            nombre: 'Fenbendazol',
+            principioActivo: 'Fenbendazol',
+            especie: 'Ambos',
+            presentacion: 'Tableta / pasta / suspension',
+            dosisRecomendada: 'Segun peso, especie y etiqueta',
+            rangoPeso: 'Variable',
+            viaAdministracion: 'Oral',
+            frecuenciaRecomendada: 'Segun diagnostico o plan preventivo',
+            parasitosCubre: 'Nematodos y algunos protozoarios segun pauta veterinaria',
+            laboratorio: 'Varios',
+            lote: '',
+            observaciones: 'No reemplaza coprologico cuando hay sospecha clinica.'
+        },
+        {
+            nombre: 'Praziquantel',
+            principioActivo: 'Praziquantel',
+            especie: 'Ambos',
+            presentacion: 'Tableta / inyectable segun producto',
+            dosisRecomendada: 'Segun peso, especie y etiqueta',
+            rangoPeso: 'Variable',
+            viaAdministracion: 'Oral / segun producto',
+            frecuenciaRecomendada: 'Segun riesgo de cestodos',
+            parasitosCubre: 'Cestodos sensibles',
+            laboratorio: 'Varios',
+            lote: '',
+            observaciones: 'Frecuente en combinaciones con pirantel/febantel.'
+        }
+    ],
+    externos: [
+        {
+            nombre: 'Blinker',
+            principioActivo: 'Por confirmar segun etiqueta',
+            especie: 'Ambos',
+            tipo: 'Pipeta / collar / spray segun presentacion',
+            rangoPeso: 'Por presentacion',
+            duracionProteccion: 'Ver etiqueta',
+            frecuenciaRecomendada: 'Segun etiqueta y riesgo',
+            parasitosCubre: 'Pulgas/garrapatas u otros segun presentacion',
+            laboratorio: 'Por confirmar',
+            lote: '',
+            observaciones: 'Producto indicado por el usuario. Completar principio activo y duracion desde envase local.',
+            advertencias: 'No extrapolar entre perros y gatos sin etiqueta especifica.'
+        },
+        {
+            nombre: 'NexGard',
+            principioActivo: 'Afoxolaner',
+            especie: 'Canino',
+            tipo: 'Comprimido masticable',
+            rangoPeso: 'Por rango de peso de la caja',
+            duracionProteccion: 'Aproximadamente 1 mes segun etiqueta',
+            frecuenciaRecomendada: 'Mensual o segun plan preventivo',
+            parasitosCubre: 'Pulgas y garrapatas',
+            laboratorio: 'Boehringer Ingelheim',
+            lote: '',
+            observaciones: 'Registrar presentacion por peso.',
+            advertencias: 'Uso canino segun etiqueta. Precaucion si hay antecedentes neurologicos.'
+        },
+        {
+            nombre: 'NexGard Spectra',
+            principioActivo: 'Afoxolaner + milbemicina oxima',
+            especie: 'Canino',
+            tipo: 'Comprimido masticable',
+            rangoPeso: 'Por rango de peso de la caja',
+            duracionProteccion: 'Aproximadamente 1 mes segun etiqueta',
+            frecuenciaRecomendada: 'Mensual o segun plan preventivo',
+            parasitosCubre: 'Pulgas, garrapatas y parasitos internos indicados por etiqueta',
+            laboratorio: 'Boehringer Ingelheim',
+            lote: '',
+            observaciones: 'Producto combinado; no duplicar preventivos internos sin revisar plan.',
+            advertencias: 'Verificar edad/peso minimo y contraindicaciones.'
+        },
+        {
+            nombre: 'Simparica',
+            principioActivo: 'Sarolaner',
+            especie: 'Canino',
+            tipo: 'Comprimido masticable',
+            rangoPeso: 'Por rango de peso de la caja',
+            duracionProteccion: 'Aproximadamente 35 dias segun etiqueta',
+            frecuenciaRecomendada: 'Mensual o segun plan preventivo',
+            parasitosCubre: 'Pulgas, garrapatas y acaros indicados por etiqueta',
+            laboratorio: 'Zoetis',
+            lote: '',
+            observaciones: 'Registrar peso actual antes de seleccionar presentacion.',
+            advertencias: 'Uso segun etiqueta.'
+        },
+        {
+            nombre: 'Simparica Trio',
+            principioActivo: 'Sarolaner + moxidectina + pirantel',
+            especie: 'Canino',
+            tipo: 'Comprimido masticable combinado',
+            rangoPeso: 'Por rango de peso de la caja',
+            duracionProteccion: 'Aproximadamente 1 mes segun etiqueta',
+            frecuenciaRecomendada: 'Mensual o segun plan preventivo',
+            parasitosCubre: 'Pulgas, garrapatas, algunos internos y dirofilaria segun etiqueta',
+            laboratorio: 'Zoetis',
+            lote: '',
+            observaciones: 'Evitar duplicar pirantel/moxidectina con otro preventivo sin revisar.',
+            advertencias: 'Verificar edad/peso minimo y riesgo individual.'
+        },
+        {
+            nombre: 'Bravecto',
+            principioActivo: 'Fluralaner',
+            especie: 'Ambos',
+            tipo: 'Comprimido / pipeta segun especie',
+            rangoPeso: 'Por rango de peso de la caja',
+            duracionProteccion: 'Hasta 12 semanas segun presentacion',
+            frecuenciaRecomendada: 'Cada 12 semanas o segun etiqueta',
+            parasitosCubre: 'Pulgas y garrapatas; otros segun etiqueta',
+            laboratorio: 'MSD Animal Health',
+            lote: '',
+            observaciones: 'Seleccionar formulacion especifica para perro o gato.',
+            advertencias: 'No intercambiar presentaciones entre especies.'
+        },
+        {
+            nombre: 'Frontline',
+            principioActivo: 'Fipronil +/- (S)-metopreno segun presentacion',
+            especie: 'Ambos',
+            tipo: 'Pipeta / spray',
+            rangoPeso: 'Por especie y peso',
+            duracionProteccion: 'Ver etiqueta',
+            frecuenciaRecomendada: 'Mensual o segun etiqueta',
+            parasitosCubre: 'Pulgas y garrapatas segun presentacion',
+            laboratorio: 'Boehringer Ingelheim / marcas autorizadas',
+            lote: '',
+            observaciones: 'Registrar presentacion exacta aplicada.',
+            advertencias: 'Respetar especie, edad y peso minimo.'
+        }
+    ]
+};
+
 function normalizarTexto(valor, fallback = '') {
     return valor === null || valor === undefined ? fallback : String(valor);
 }
@@ -101,6 +398,65 @@ async function cargarCacheBancoClinico(force = false) {
     await Promise.all(tareas);
 }
 
+function nombreCatalogoNormalizado(nombre) {
+    return normalizarTexto(nombre)
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+async function insertarFaltantesCatalogo(items, existentes, guardarFn) {
+    const nombresExistentes = new Set((existentes || []).map(item => nombreCatalogoNormalizado(item.nombre)));
+    let insertados = 0;
+
+    for (const item of items) {
+        const clave = nombreCatalogoNormalizado(item.nombre);
+        if (!clave || nombresExistentes.has(clave)) continue;
+        await guardarFn(item);
+        nombresExistentes.add(clave);
+        insertados++;
+    }
+
+    return insertados;
+}
+
+async function cargarCatalogoEcuador() {
+    if (!window.API || !window.API.isLoggedIn()) {
+        mostrarToast('Inicia sesion para cargar el catalogo en Supabase.', 'error');
+        return;
+    }
+
+    try {
+        mostrarToast('Cargando catalogo veterinario Ecuador...', 'info');
+        await cargarCacheBancoClinico(true);
+
+        const vacunas = await insertarFaltantesCatalogo(
+            CATALOGO_ECUADOR.vacunas,
+            cacheVacunas,
+            datos => window.API.guardarBancoVacuna(datos)
+        );
+        const internos = await insertarFaltantesCatalogo(
+            CATALOGO_ECUADOR.internos,
+            cacheInternos,
+            datos => window.API.guardarBancoInterno(datos)
+        );
+        const externos = await insertarFaltantesCatalogo(
+            CATALOGO_ECUADOR.externos,
+            cacheExternos,
+            datos => window.API.guardarBancoExterno(datos)
+        );
+
+        await cargarCacheBancoClinico(true);
+        cambiarPestañaBanco(bancoPestañaActiva || 'vacunas');
+        mostrarToast(`Catalogo cargado: ${vacunas} vacunas, ${internos} internos, ${externos} externos.`, 'success');
+    } catch (err) {
+        console.error('Error cargando catalogo Ecuador:', err);
+        mostrarToast(err.message || 'No se pudo cargar el catalogo Ecuador.', 'error');
+    }
+}
+
 // Inicializar el Banco Clínico cuando sea necesario
 document.addEventListener('DOMContentLoaded', () => {
     configurarManejadoresBanco();
@@ -114,7 +470,7 @@ function cambiarPestañaBanco(tabName) {
     bancoPestañaActiva = tabName;
     
     // Actualizar estados visuales de los botones de pestañas
-    const tabs = ['vacunas', 'internos', 'externos'];
+    const tabs = ['vacunas', 'internos', 'externos', 'medicamentos', 'codigos'];
     tabs.forEach(t => {
         const btn = document.getElementById(`btn-tab-banco-${t}`);
         const pane = document.getElementById(`banco-tab-content-${t}`);

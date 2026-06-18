@@ -121,7 +121,7 @@ async function guardarVeterinaria(datos) {
         return true;
     } catch (e) {
         console.error('Error al guardar datos de la veterinaria en API:', e);
-        return false;
+        throw e;
     }
 }
 
@@ -194,7 +194,11 @@ async function guardarMascota(mascota) {
         return await API.registrarMascota(mascota);
     } catch (e) {
         console.error('Error al guardar la mascota en API:', e);
-        return null;
+        if (e instanceof TypeError || /fetch|network|failed/i.test(e.message || '')) {
+            const apiUrl = window.API_BASE_URL || 'http://localhost:3000/api';
+            throw new Error(`No se pudo conectar con el servidor API (${apiUrl}). Inicia Cartilla Digital con npm.cmd start o usa iniciar_servidor.bat.`);
+        }
+        throw e;
     }
 }
 
