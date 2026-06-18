@@ -6,6 +6,16 @@
 // Estado adicional para prevenir pérdida de datos
 let formularioModificado = false;
 
+function normalizarEmailFormulario(valor) {
+    return (valor || '').trim().toLowerCase();
+}
+
+function esEmailValidoOpcional(valor) {
+    const email = normalizarEmailFormulario(valor);
+    if (!email) return true;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Inicializar eventos principales del DOM y filtros
     inicializarUI();
@@ -221,6 +231,7 @@ function configurarManejadoresFormularios() {
             const nombre = document.getElementById('vet-nombre').value.trim();
             const propietario = document.getElementById('vet-propietario').value.trim();
             const telefono = document.getElementById('vet-telefono').value.trim();
+            const email = normalizarEmailFormulario(document.getElementById('vet-email')?.value || '');
             const direccion = document.getElementById('vet-direccion').value.trim();
             
             if (!nombre) {
@@ -232,10 +243,16 @@ function configurarManejadoresFormularios() {
                 mostrarToast('El nombre del propietario es requerido.', 'error');
                 return;
             }
+
+            if (!email || !esEmailValidoOpcional(email)) {
+                mostrarToast('Ingresa un correo de contacto vÃ¡lido.', 'error');
+                return;
+            }
             
             const datos = {
                 nombre,
                 propietario,
+                email,
                 telefono,
                 direccion,
                 logo: UIState.logoBase64
@@ -277,8 +294,14 @@ function configurarManejadoresFormularios() {
             const peso = document.getElementById('pet-peso').value.trim();
             const tutorNombre = document.getElementById('pet-tutor').value.trim();
             const tutorTel = document.getElementById('pet-tutor-tel').value.trim();
+            const tutorEmail = normalizarEmailFormulario(document.getElementById('pet-tutor-email')?.value || '');
             const tutorDir = document.getElementById('pet-tutor-dir').value.trim();
             const observaciones = document.getElementById('pet-obs').value.trim();
+
+            if (!esEmailValidoOpcional(tutorEmail)) {
+                mostrarToast('Ingresa un correo vÃ¡lido o deja el campo vacÃ­o.', 'error');
+                return;
+            }
             
             const datosMascota = {
                 nombre,
@@ -292,6 +315,7 @@ function configurarManejadoresFormularios() {
                 tutor: {
                     nombre: tutorNombre,
                     telefono: tutorTel,
+                    email: tutorEmail,
                     direccion: tutorDir
                 },
                 observaciones
@@ -552,6 +576,11 @@ function configurarManejadoresFormularios() {
     if (formTxRecibir) {
         formTxRecibir.addEventListener('submit', async (e) => {
             e.preventDefault();
+            mostrarToast('La recepcion por codigo fue reemplazada por el Buzon de Transferencia.', 'info');
+            cerrarModal('transferencia-recibir');
+            if (typeof transferSetTab === 'function') transferSetTab('buzon');
+            navegarA('transferencia');
+            return;
             const codigo = document.getElementById('tx-codigo-input').value.trim();
             
             if (!codigo) {

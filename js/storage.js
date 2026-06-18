@@ -42,9 +42,13 @@ function sanearEsquemaMascota(mascota) {
         color: mascota.color || '',
         peso: mascota.peso ? parseFloat(mascota.peso) : '',
         foto: mascota.foto || '',
+        sourcePatientCode: mascota.sourcePatientCode || mascota.source_patient_code || '',
+        receivedByTransfer: !!(mascota.receivedByTransfer || mascota.received_by_transfer),
+        transferStatus: mascota.transferStatus || mascota.transfer_status || 'active',
         tutor: {
             nombre: mascota.tutor?.nombre || 'Sin Tutor',
             telefono: mascota.tutor?.telefono || '',
+            email: mascota.tutor?.email || mascota.tutor_email || '',
             direccion: mascota.tutor?.direccion || ''
         },
         vacunas: Array.isArray(mascota.vacunas) ? mascota.vacunas.map(sanearEsquemaVacuna) : [],

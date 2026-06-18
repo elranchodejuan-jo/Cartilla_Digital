@@ -29,7 +29,7 @@ const TRANSFER_PERMISSION_FIELDS = [
     ['includeNextAppointments', 'Proximas citas'],
     ['includeObservations', 'Observaciones importantes'],
     ['includePhotos', 'Fotos'],
-    ['includeFullHistory', 'Enviar historial completo']
+    ['includeFullHistory', 'Seleccionar todo / Enviar historial completo']
 ];
 
 function transferDefaultPermissions(full = false) {
@@ -209,7 +209,14 @@ function transferMovementsHtml() {
     `;
 }
 
-function transferStartSendWizard(destinationClinicId = '') {
+function transferSyncFullHistory(permissions) {
+    const detailFields = TRANSFER_PERMISSION_FIELDS
+        .map(([field]) => field)
+        .filter(field => field !== 'includeFullHistory');
+    permissions.includeFullHistory = detailFields.every(field => !!permissions[field]);
+}
+
+function transferStartSendWizard(destinationClinicId = '', patientIds = []) {
     TransferState.sendWizard = {
         step: 1,
         query: '',
@@ -221,6 +228,7 @@ function transferStartSendWizard(destinationClinicId = '') {
         reason: '',
         permissions: transferDefaultPermissions(false)
     };
+    patientIds.filter(Boolean).forEach(id => TransferState.sendWizard.selected.add(id));
     TransferState.requestWizard = null;
     TransferState.tab = 'movimientos';
     renderizarTransferencias(false);
@@ -671,11 +679,13 @@ function transferChooseDestination(clinicId) {
 
 function transferToggleSendPermission(field, checked) {
     if (!TransferState.sendWizard) return;
-    TransferState.sendWizard.permissions[field] = checked;
     if (field === 'includeFullHistory') {
         Object.keys(TransferState.sendWizard.permissions).forEach(key => {
-            TransferState.sendWizard.permissions[key] = checked || ['includePetData', 'includeTutorData'].includes(key);
+            TransferState.sendWizard.permissions[key] = checked;
         });
+    } else {
+        TransferState.sendWizard.permissions[field] = checked;
+        transferSyncFullHistory(TransferState.sendWizard.permissions);
     }
     renderizarTransferencias(false);
 }
@@ -897,11 +907,13 @@ function transferSelectMatch(id) {
 
 function transferToggleDetailPermission(field, checked) {
     if (!TransferState.detail) return;
-    TransferState.detail.permissions[field] = checked;
     if (field === 'includeFullHistory') {
         Object.keys(TransferState.detail.permissions).forEach(key => {
-            TransferState.detail.permissions[key] = checked || ['includePetData', 'includeTutorData'].includes(key);
+            TransferState.detail.permissions[key] = checked;
         });
+    } else {
+        TransferState.detail.permissions[field] = checked;
+        transferSyncFullHistory(TransferState.detail.permissions);
     }
     renderizarTransferencias(false);
 }

@@ -180,7 +180,6 @@ function configurarSidebarClinico() {
         ],
         registrarMascota: [
             ['Registrar mascota', { registerView: 'mascota' }],
-            ['Registro rapido', { registerView: 'rapido' }],
             ['Registrar atencion preventiva', { registerView: 'preventiva' }],
             ['Importar pacientes', { registerView: 'importar' }]
         ],
@@ -348,6 +347,15 @@ function actualizarSidebarClinica() {
     }
 }
 
+function actualizarCodigoOrigenCartilla(mascota) {
+    const sourceEl = document.getElementById('cartilla-source-code');
+    const sourceText = sourceEl ? sourceEl.querySelector('span') : null;
+    if (!sourceEl || !sourceText) return;
+    const sourceCode = mascota?.sourcePatientCode || '';
+    sourceEl.hidden = !sourceCode;
+    sourceText.textContent = sourceCode;
+}
+
 function configurarFiltrosDashboard() {
     document.querySelectorAll('.dashboard-range').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -385,6 +393,8 @@ function configurarVistasRegistro() {
 }
 
 function cambiarVistaRegistro(view = 'mascota') {
+    const vistasPermitidas = new Set(['mascota', 'preventiva', 'importar']);
+    if (!vistasPermitidas.has(view)) view = 'mascota';
     UIState.registerView = view;
     document.querySelectorAll('.register-tab').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.registerView === view);
@@ -601,6 +611,8 @@ function cargarDatosFormVeterinaria() {
         document.getElementById('vet-propietario').value = vet.propietario || '';
         document.getElementById('vet-iniciales').value = vet.iniciales || '';
         document.getElementById('vet-telefono').value = vet.telefono || '';
+        const emailInput = document.getElementById('vet-email');
+        if (emailInput) emailInput.value = (vet.email || '').trim().toLowerCase();
         document.getElementById('vet-direccion').value = vet.direccion || '';
         
         UIState.logoBase64 = vet.logo || '';
@@ -1046,6 +1058,29 @@ function fechaISO(fecha) {
     return fecha.toISOString().split('T')[0];
 }
 
+function esEmailTutorValido(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((email || '').trim());
+}
+
+function obtenerClaveTutor(mascota) {
+    const nombre = (mascota.tutor?.nombre || '').trim().toLowerCase();
+    const telefono = (mascota.tutor?.telefono || '').trim().toLowerCase();
+    return nombre || telefono ? `${nombre}|${telefono}` : `mascota:${mascota.id}`;
+}
+
+function contarTutoresSinCorreo(mascotas) {
+    const tutores = new Map();
+    mascotas.forEach(mascota => {
+        const clave = obtenerClaveTutor(mascota);
+        const actual = tutores.get(clave) || { tieneCorreo: false };
+        if (esEmailTutorValido(mascota.tutor?.email)) {
+            actual.tieneCorreo = true;
+        }
+        tutores.set(clave, actual);
+    });
+    return Array.from(tutores.values()).filter(tutor => !tutor.tieneCorreo).length;
+}
+
 function renderizarAlertasClinicas(mascotas, eventos) {
     const container = document.getElementById('dashboard-alertas-clinicas');
     if (!container) return;
@@ -1053,7 +1088,7 @@ function renderizarAlertasClinicas(mascotas, eventos) {
     const desparasitacionesVencidas = eventos.filter(e => e.categoria === 'desparasitacion' && e.diasRestantes < 0).length;
     const pacientesSinTutorCompleto = mascotas.filter(m => !m.tutor?.nombre || !m.tutor?.telefono).length;
     const tutoresSinTelefono = mascotas.filter(m => !m.tutor?.telefono).length;
-    const tutoresSinCorreo = mascotas.length;
+    const tutoresSinCorreo = contarTutoresSinCorreo(mascotas);
     const pacientesSinProximaCita = mascotas.filter(m => !tieneProximaAtencion(m)).length;
     const incompletos = mascotas.filter(m => !m.nombre || !m.especie || !m.raza || !m.sexo || !m.fechaNacimiento || !m.tutor?.nombre).length;
     const alertas = [
@@ -1092,6 +1127,7 @@ async function renderizarListadoPacientes() {
                     ind.desparasitacionVencida > 0 ||
                     !m.tutor?.nombre ||
                     !m.tutor?.telefono ||
+                    !esEmailTutorValido(m.tutor?.email) ||
                     !tieneProximaAtencion(m);
             });
         } else {
@@ -1110,6 +1146,7 @@ async function renderizarListadoPacientes() {
                    m.tutor.nombre.toLowerCase().includes(query) ||
                    m.codigo.toLowerCase().includes(query) ||
                    (m.tutor.telefono || '').toLowerCase().includes(query) ||
+                   (m.tutor.email || '').toLowerCase().includes(query) ||
                    (m.especie || '').toLowerCase().includes(query) ||
                    m.raza.toLowerCase().includes(query);
         });
@@ -1246,6 +1283,8 @@ async function prepararEdicionMascota(id) {
     document.getElementById('pet-peso').value = mascota.peso || '';
     document.getElementById('pet-tutor').value = mascota.tutor.nombre;
     document.getElementById('pet-tutor-tel').value = mascota.tutor.telefono || '';
+    const tutorEmailInput = document.getElementById('pet-tutor-email');
+    if (tutorEmailInput) tutorEmailInput.value = mascota.tutor.email || '';
     document.getElementById('pet-tutor-dir').value = mascota.tutor.direccion || '';
     document.getElementById('pet-obs').value = mascota.observaciones || '';
     
@@ -1313,6 +1352,7 @@ async function verCartillaMascota(id) {
     document.getElementById('cartilla-clinic-nombre').textContent = vet.nombre;
     document.getElementById('cartilla-clinic-contacto').textContent = `Tel: ${vet.telefono || 'N/A'} | Dirección: ${vet.direccion || 'N/A'}`;
     document.getElementById('cartilla-unique-code').textContent = mascota.codigo;
+    actualizarCodigoOrigenCartilla(mascota);
     
     // Mascota
     document.getElementById('cartilla-pet-photo').src = obtenerFotoMascota(mascota);
@@ -2061,11 +2101,13 @@ function actualizarUIConEstadoAuth(loggedIn) {
 }
 
 function abrirModalTransferencia() {
-    abrirModal('transferencia-recibir');
+    UIState.seccionActiva = 'transferencia';
+    if (typeof transferSetTab === 'function') transferSetTab('buzon');
+    navegarA('transferencia');
 }
 
 function cerrarModalTransferencia() {
-    cerrarModal('transferencia-recibir');
+    navegarA('transferencia');
 }
 
 async function iniciarTransferenciaMascota() {
@@ -2073,6 +2115,11 @@ async function iniciarTransferenciaMascota() {
         mostrarToast('No hay ninguna mascota activa para transferir.', 'error');
         return;
     }
+    await navegarA('transferencia');
+    if (typeof transferStartSendWizard === 'function') {
+        transferStartSendWizard('', [UIState.mascotaActivaId]);
+    }
+    return;
     
     try {
         mostrarToast('Generando código de transferencia...', 'info');
@@ -2103,6 +2150,7 @@ async function verCartillaMascotaPublica(id) {
         document.getElementById('cartilla-clinic-nombre').textContent = vet.nombre;
         document.getElementById('cartilla-clinic-contacto').textContent = `Tel: ${vet.telefono || 'N/A'} | Dirección: ${vet.direccion || 'N/A'}`;
         document.getElementById('cartilla-unique-code').textContent = mascota.codigo;
+        actualizarCodigoOrigenCartilla(mascota);
         
         // Mascota
         document.getElementById('cartilla-pet-photo').src = obtenerFotoMascota(mascota);

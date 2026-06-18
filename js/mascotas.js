@@ -56,6 +56,12 @@ function calcularEdadMascota(fechaNacimientoString) {
  * @param {Object} datosMascota - Formulario de mascota.
  * @returns {Promise<Object|null>} Retorna la mascota guardada o arroja un error.
  */
+function emailMascotaValidoOpcional(valor) {
+    const email = (valor || '').trim();
+    if (!email) return true;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
 async function registrarMascota(datosMascota) {
     // 1. Validaciones de negocio obligatorias
     if (!datosMascota.nombre || !datosMascota.nombre.trim()) {
@@ -72,6 +78,9 @@ async function registrarMascota(datosMascota) {
     }
     if (!datosMascota.tutor?.nombre || !datosMascota.tutor.nombre.trim()) {
         throw new Error("El nombre del tutor es obligatorio.");
+    }
+    if (!emailMascotaValidoOpcional(datosMascota.tutor?.email)) {
+        throw new Error("Ingresa un correo válido o deja el campo vacío.");
     }
     if (datosMascota.peso !== '' && (isNaN(datosMascota.peso) || parseFloat(datosMascota.peso) < 0)) {
         throw new Error("El peso debe ser un número positivo.");
@@ -101,6 +110,9 @@ async function editarMascota(id, datosModificados) {
     }
     if (!datosModificados.tutor?.nombre || !datosModificados.tutor.nombre.trim()) {
         throw new Error("El nombre del tutor es obligatorio.");
+    }
+    if (!emailMascotaValidoOpcional(datosModificados.tutor?.email)) {
+        throw new Error("Ingresa un correo válido o deja el campo vacío.");
     }
     if (datosModificados.peso !== '' && (isNaN(datosModificados.peso) || parseFloat(datosModificados.peso) < 0)) {
         throw new Error("El peso debe ser un número positivo.");

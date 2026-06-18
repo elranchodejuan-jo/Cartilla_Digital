@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS mascotas (
     foto_base64 TEXT,
     tutor_nombre VARCHAR(150) NOT NULL DEFAULT 'Sin Tutor',
     tutor_telefono VARCHAR(50),
+    tutor_email TEXT,
     tutor_direccion TEXT,
     observaciones TEXT,
     fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -43,6 +44,9 @@ CREATE TABLE IF NOT EXISTS mascotas (
 
 CREATE INDEX IF NOT EXISTS idx_mascotas_veterinaria ON mascotas(veterinaria_id);
 CREATE INDEX IF NOT EXISTS idx_mascotas_codigo ON mascotas(codigo);
+
+ALTER TABLE mascotas
+    ADD COLUMN IF NOT EXISTS tutor_email TEXT;
 
 -- 3. TABLA: RAZAS PERSONALIZADAS POR CLINICA
 CREATE TABLE IF NOT EXISTS razas_clinica (
@@ -152,12 +156,20 @@ CREATE INDEX IF NOT EXISTS idx_transferencias_codigo ON transferencias(codigo_tr
 ALTER TABLE mascotas
     ADD COLUMN IF NOT EXISTS source_veterinaria_id UUID REFERENCES veterinarias(id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS source_mascota_id UUID REFERENCES mascotas(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS source_patient_code VARCHAR(50),
     ADD COLUMN IF NOT EXISTS received_by_transfer BOOLEAN DEFAULT FALSE,
     ADD COLUMN IF NOT EXISTS transfer_request_id UUID,
+    ADD COLUMN IF NOT EXISTS code_species VARCHAR(1),
+    ADD COLUMN IF NOT EXISTS code_date VARCHAR(6),
+    ADD COLUMN IF NOT EXISTS code_counter INTEGER,
     ADD COLUMN IF NOT EXISTS transfer_status VARCHAR(30) DEFAULT 'active';
 
 CREATE INDEX IF NOT EXISTS idx_mascotas_source ON mascotas(source_veterinaria_id, source_mascota_id);
 CREATE INDEX IF NOT EXISTS idx_mascotas_transfer_request ON mascotas(transfer_request_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_mascotas_veterinaria_codigo ON mascotas(veterinaria_id, codigo);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_mascotas_code_sequence
+    ON mascotas(veterinaria_id, code_species, code_date, code_counter)
+    WHERE code_species IS NOT NULL AND code_date IS NOT NULL AND code_counter IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS clinic_associations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

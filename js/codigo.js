@@ -39,12 +39,14 @@ function formatearFechaAAMMDD(fechaInput) {
 function generarCodigoCartilla({ inicialesVeterinaria, especie, fecha, numeroPaciente }) {
     const prefijo = "CD";
     
-    // Especie: C = Canino, F = Felino, O = Otro (por seguridad)
-    // Se mantiene soporte retroactivo para 'perro' y 'gato'
-    let especieCodigo = "O";
+    // Especie oficial: C = Canino, F = Felino.
+    let especieCodigo = "";
     const espLower = (especie || "").toLowerCase().trim();
-    if (espLower === "canino" || espLower === "perro") especieCodigo = "C";
-    else if (espLower === "felino" || espLower === "gato") especieCodigo = "F";
+    if (espLower === "canino" || espLower === "perro" || espLower === "c") especieCodigo = "C";
+    else if (espLower === "felino" || espLower === "gato" || espLower === "f") especieCodigo = "F";
+    if (!especieCodigo) {
+        throw new Error("Especie invalida para generar codigo. Usa Canino o Felino.");
+    }
     
     // Formatear la fecha
     const fechaCodigo = formatearFechaAAMMDD(fecha);

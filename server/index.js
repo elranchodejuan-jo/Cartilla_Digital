@@ -73,6 +73,14 @@ function normalizarTextoPerfil(valor) {
     return (valor || '').trim().replace(/\s+/g, ' ');
 }
 
+function normalizarEmail(valor) {
+    return (valor || '').trim().toLowerCase();
+}
+
+function esEmailValido(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
 async function sincronizarPropietarioConEquipo(veterinariaId, propietario, queryable = db) {
     const nombrePropietario = normalizarTextoPerfil(propietario);
     if (!nombrePropietario) return;
@@ -102,9 +110,14 @@ async function sincronizarPropietarioConEquipo(veterinariaId, propietario, query
 app.post('/api/auth/register', async (req, res) => {
     const { email, password, nombre, propietario, iniciales, telefono, direccion, logo } = req.body;
     const propietarioLimpio = normalizarTextoPerfil(propietario);
+    const emailRegistro = normalizarEmail(email);
     
     if (!email || !password || !nombre || !propietarioLimpio || !iniciales) {
         return res.status(400).json({ error: 'Faltan campos requeridos (email, contrasena, nombre, propietario, iniciales).' });
+    }
+
+    if (!esEmailValido(emailRegistro)) {
+        return res.status(400).json({ error: 'Ingresa un correo electrónico válido.' });
     }
     
     const inicialesUpper = iniciales.trim().toUpperCase();
@@ -124,7 +137,7 @@ app.post('/api/auth/register', async (req, res) => {
         `;
         // Subir logo a Storage si es Base64
         const logoFinal = await subirImagenAStorage(logo, 'logos');
-        const values = [email.trim().toLowerCase(), passwordHash, nombre.trim(), propietarioLimpio, inicialesUpper, telefono, direccion, logoFinal];
+        const values = [emailRegistro, passwordHash, nombre.trim(), propietarioLimpio, inicialesUpper, telefono, direccion, logoFinal];
         
         const result = await db.query(queryText, values);
         const vetId = result.rows[0].id;
@@ -335,8 +348,9 @@ app.get('/api/veterinaria', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/veterinaria', authMiddleware, async (req, res) => {
-    const { nombre, propietario, telefono, direccion, logo } = req.body;
+    const { nombre, propietario, email, telefono, direccion, logo } = req.body;
     const propietarioLimpio = normalizarTextoPerfil(propietario);
+    const emailContacto = normalizarEmail(email || req.veterinaria.email);
     
     if (!nombre) {
         return res.status(400).json({ error: 'El nombre es obligatorio.' });
@@ -345,23 +359,30 @@ app.put('/api/veterinaria', authMiddleware, async (req, res) => {
     if (!propietarioLimpio) {
         return res.status(400).json({ error: 'El nombre del propietario es obligatorio.' });
     }
+
+    if (!emailContacto || !esEmailValido(emailContacto)) {
+        return res.status(400).json({ error: 'Ingresa un correo de contacto válido.' });
+    }
     
     try {
         const queryText = `
             UPDATE veterinarias
-            SET nombre = $1, propietario = $2, telefono = $3, direccion = $4, logo_base64 = $5
-            WHERE id = $6
+            SET nombre = $1, propietario = $2, email = $3, telefono = $4, direccion = $5, logo_base64 = $6
+            WHERE id = $7
             RETURNING id, email, nombre, propietario, iniciales, telefono, direccion, logo_base64 AS logo
         `;
         // Subir logo a Storage si es Base64
         const logoFinal = await subirImagenAStorage(logo, 'logos');
-        const values = [nombre.trim(), propietarioLimpio, telefono, direccion, logoFinal, req.veterinaria.id];
+        const values = [nombre.trim(), propietarioLimpio, emailContacto, telefono, direccion, logoFinal, req.veterinaria.id];
         const result = await db.query(queryText, values);
         await sincronizarPropietarioConEquipo(req.veterinaria.id, propietarioLimpio);
         
         res.json({ mensaje: 'Perfil actualizado con éxito.', veterinaria: result.rows[0] });
     } catch (err) {
         console.error(err);
+        if (err.code === '23505') {
+            return res.status(400).json({ error: 'El correo de contacto ya está registrado en otra clínica.' });
+        }
         res.status(500).json({ error: 'Error al actualizar perfil.' });
     }
 });
@@ -509,9 +530,13 @@ app.get('/api/mascotas', authMiddleware, async (req, res) => {
             color: row.color || '',
             peso: row.peso || '',
             foto: row.foto || '',
+            sourcePatientCode: row.source_patient_code || '',
+            receivedByTransfer: !!row.received_by_transfer,
+            transferStatus: row.transfer_status || 'active',
             tutor: {
                 nombre: row.tutor_nombre || 'Sin Tutor',
                 telefono: row.tutor_telefono || '',
+                email: row.tutor_email || '',
                 direccion: row.tutor_direccion || ''
             },
             observaciones: row.observaciones || '',
@@ -534,30 +559,67 @@ function formatearFechaAAMMDD(date) {
     return `${y}${m}${d}`;
 }
 
-async function generarCodigoPacienteParaClinica(queryable, clinica, especie) {
-    const hoy = new Date();
-    let especieCodigo = 'O';
+function normalizarCodigoEspecie(especie) {
     const espLower = (especie || '').toLowerCase().trim();
-    if (espLower === 'perro' || espLower === 'canino') especieCodigo = 'C';
-    else if (espLower === 'gato' || espLower === 'felino') especieCodigo = 'F';
+    if (espLower === 'perro' || espLower === 'canino' || espLower === 'c') return 'C';
+    if (espLower === 'gato' || espLower === 'felino' || espLower === 'f') return 'F';
+    return '';
+}
 
-    const iniciales = (clinica.iniciales || 'CD').toUpperCase();
-    const fechaCodigo = formatearFechaAAMMDD(hoy);
+function formatearContadorPaciente(contador) {
+    const numero = Number(contador);
+    if (!Number.isInteger(numero) || numero < 1) {
+        throw new Error('Contador de paciente invalido.');
+    }
+    return numero < 100 ? String(numero).padStart(2, '0') : String(numero);
+}
+
+async function generarCodigoPacienteParaClinica(queryable, clinica, especie, fecha = new Date()) {
+    if (!clinica?.id) {
+        throw new Error('No se pudo generar codigo sin clinica actual.');
+    }
+    const iniciales = (clinica.iniciales || '').trim().toUpperCase();
+    if (!iniciales) {
+        throw new Error('No se pudo generar codigo sin iniciales de clinica.');
+    }
+
+    const especieCodigo = normalizarCodigoEspecie(especie);
+    if (!especieCodigo) {
+        throw new Error('Especie invalida para generar codigo. Usa Canino o Felino.');
+    }
+
+    const fechaCodigo = formatearFechaAAMMDD(fecha);
     const codigoPrefix = `CD-${iniciales}-${especieCodigo}-${fechaCodigo}-`;
+    const secuenciaRes = await queryable.query(
+        `SELECT COALESCE(MAX(code_counter), 0)::int AS max_counter
+         FROM mascotas
+         WHERE veterinaria_id = $1
+           AND code_species = $2
+           AND code_date = $3`,
+        [clinica.id, especieCodigo, fechaCodigo]
+    );
+
     const codigosRes = await queryable.query(
         `SELECT codigo
          FROM mascotas
          WHERE veterinaria_id = $1
-           AND codigo LIKE $2
-         ORDER BY codigo DESC`,
+           AND codigo LIKE $2`,
         [clinica.id, `${codigoPrefix}%`]
     );
-    const mayorCorrelativo = codigosRes.rows.reduce((max, row) => {
+    const maxDesdeCodigo = codigosRes.rows.reduce((max, row) => {
         const match = String(row.codigo || '').match(/-(\d+)$/);
         const numero = match ? parseInt(match[1], 10) : 0;
         return Number.isFinite(numero) && numero > max ? numero : max;
     }, 0);
-    return `${codigoPrefix}${String(mayorCorrelativo + 1).padStart(3, '0')}`;
+    const maxDesdeMetadata = secuenciaRes.rows[0]?.max_counter || 0;
+    const contador = Math.max(maxDesdeMetadata, maxDesdeCodigo) + 1;
+
+    return {
+        codigo: `${codigoPrefix}${formatearContadorPaciente(contador)}`,
+        codeSpecies: especieCodigo,
+        codeDate: fechaCodigo,
+        codeCounter: contador
+    };
 }
 
 /**
@@ -565,9 +627,14 @@ async function generarCodigoPacienteParaClinica(queryable, clinica, especie) {
  */
 app.post('/api/mascotas', authMiddleware, async (req, res) => {
     const { nombre, especie, raza, sexo, fechaNacimiento, color, peso, foto, tutor, observaciones } = req.body;
+    const tutorEmail = normalizarEmail(tutor?.email);
     
     if (!nombre || !especie || !fechaNacimiento || !tutor?.nombre) {
         return res.status(400).json({ error: 'Nombre, especie, fecha de nacimiento y tutor son obligatorios.' });
+    }
+
+    if (tutorEmail && !esEmailValido(tutorEmail)) {
+        return res.status(400).json({ error: 'Ingresa un correo válido o deja el campo vacío.' });
     }
     
     try {
@@ -585,10 +652,10 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
         const correlativo = parseInt(countRes.rows[0].count) + 1;
         
         // 2. Generar el código único de cartilla
-        let especieCodigo = "O";
-        const espLower = especie.toLowerCase().trim();
-        if (espLower === "perro" || espLower === "canino") especieCodigo = "C";
-        else if (espLower === "gato" || espLower === "felino") especieCodigo = "F";
+        let especieCodigo = normalizarCodigoEspecie(especie);
+        if (!especieCodigo) {
+            return res.status(400).json({ error: 'Especie invalida para generar codigo. Usa Canino o Felino.' });
+        }
         
         const fechaCodigo = formatearFechaAAMMDD(hoy);
         const codigoPrefix = `CD-${req.veterinaria.iniciales.toUpperCase()}-${especieCodigo}-${fechaCodigo}-`;
@@ -605,14 +672,21 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
             const numero = match ? parseInt(match[1], 10) : 0;
             return Number.isFinite(numero) && numero > max ? numero : max;
         }, 0);
-        const contadorStr = String(Math.max(correlativo, mayorCorrelativo + 1)).padStart(3, "0");
-        const codigoUnico = `CD-${req.veterinaria.iniciales.toUpperCase()}-${especieCodigo}-${fechaCodigo}-${contadorStr}`;
+        const codeCounter = Math.max(correlativo, mayorCorrelativo + 1);
+        const contadorStr = formatearContadorPaciente(codeCounter);
+        let codigoUnico = `CD-${req.veterinaria.iniciales.toUpperCase()}-${especieCodigo}-${fechaCodigo}-${contadorStr}`;
+        const codigoGenerado = await generarCodigoPacienteParaClinica(
+            db,
+            { id: req.veterinaria.id, iniciales: req.veterinaria.iniciales },
+            especie
+        );
+        codigoUnico = codigoGenerado.codigo;
         
         // 3. Insertar mascota
         const insertQuery = `
             INSERT INTO mascotas 
-            (codigo, veterinaria_iniciales, veterinaria_id, nombre, especie, raza, sexo, fecha_nacimiento, color, peso, foto_base64, tutor_nombre, tutor_telefono, tutor_direccion, observaciones)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            (codigo, veterinaria_iniciales, veterinaria_id, nombre, especie, raza, sexo, fecha_nacimiento, color, peso, foto_base64, tutor_nombre, tutor_telefono, tutor_email, tutor_direccion, observaciones, code_species, code_date, code_counter)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
             RETURNING *
         `;
         const fotoFinal = await subirImagenAStorage(foto, 'mascotas');
@@ -630,8 +704,12 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
             fotoFinal || '',
             tutor.nombre.trim(),
             tutor.telefono ? tutor.telefono.trim() : '',
+            tutorEmail || null,
             tutor.direccion ? tutor.direccion.trim() : '',
-            observaciones ? observaciones.trim() : ''
+            observaciones ? observaciones.trim() : '',
+            codigoGenerado.codeSpecies,
+            codigoGenerado.codeDate,
+            codigoGenerado.codeCounter
         ];
         
         const result = await db.query(insertQuery, values);
@@ -650,9 +728,13 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
             color: row.color || '',
             peso: row.peso || '',
             foto: row.foto_base64 || '',
+            sourcePatientCode: row.source_patient_code || '',
+            receivedByTransfer: !!row.received_by_transfer,
+            transferStatus: row.transfer_status || 'active',
             tutor: {
                 nombre: row.tutor_nombre,
                 telefono: row.tutor_telefono || '',
+                email: row.tutor_email || '',
                 direccion: row.tutor_direccion || ''
             },
             observaciones: row.observaciones || '',
@@ -753,9 +835,13 @@ app.get('/api/mascotas/:id', authMiddleware, async (req, res) => {
             color: row.color || '',
             peso: row.peso || '',
             foto: row.foto_base64 || '',
+            sourcePatientCode: row.source_patient_code || '',
+            receivedByTransfer: !!row.received_by_transfer,
+            transferStatus: row.transfer_status || 'active',
             tutor: {
                 nombre: row.tutor_nombre,
                 telefono: row.tutor_telefono || '',
+                email: row.tutor_email || '',
                 direccion: row.tutor_direccion || ''
             },
             observaciones: row.observaciones || '',
@@ -799,6 +885,7 @@ app.put('/api/mascotas/:id', authMiddleware, async (req, res) => {
         }
         const finalTutorNombre = tutor?.nombre !== undefined ? tutor.nombre.trim() : orig.tutor_nombre;
         const finalTutorTel = tutor?.telefono !== undefined ? tutor.telefono.trim() : orig.tutor_telefono;
+        const finalTutorEmail = tutor?.email !== undefined ? normalizarEmail(tutor.email) : (orig.tutor_email || null);
         const finalTutorDir = tutor?.direccion !== undefined ? tutor.direccion.trim() : orig.tutor_direccion;
         const finalObs = observaciones !== undefined ? observaciones.trim() : orig.observaciones;
         
@@ -806,13 +893,17 @@ app.put('/api/mascotas/:id', authMiddleware, async (req, res) => {
         if (!finalNombre || !finalEspecie || !finalFechaNac || !finalTutorNombre) {
             return res.status(400).json({ error: 'Nombre, especie, fecha de nacimiento y tutor son obligatorios.' });
         }
+
+        if (finalTutorEmail && !esEmailValido(finalTutorEmail)) {
+            return res.status(400).json({ error: 'Ingresa un correo válido o deja el campo vacío.' });
+        }
         
         const updateQuery = `
             UPDATE mascotas
-            SET nombre = $1, especie = $2, raza = $3, sexo = $4, fecha_nacimiento = $5, color = $6, peso = $7, foto_base64 = $8, tutor_nombre = $9, tutor_telefono = $10, tutor_direccion = $11, observaciones = $12
-            WHERE id = $13 AND veterinaria_id = $14
+            SET nombre = $1, especie = $2, raza = $3, sexo = $4, fecha_nacimiento = $5, color = $6, peso = $7, foto_base64 = $8, tutor_nombre = $9, tutor_telefono = $10, tutor_email = $11, tutor_direccion = $12, observaciones = $13
+            WHERE id = $14 AND veterinaria_id = $15
         `;
-        const values = [finalNombre, finalEspecie, finalRaza, finalSexo, finalFechaNac, finalColor, finalPeso, finalFoto, finalTutorNombre, finalTutorTel, finalTutorDir, finalObs, id, req.veterinaria.id];
+        const values = [finalNombre, finalEspecie, finalRaza, finalSexo, finalFechaNac, finalColor, finalPeso, finalFoto, finalTutorNombre, finalTutorTel, finalTutorEmail || null, finalTutorDir, finalObs, id, req.veterinaria.id];
         await db.query(updateQuery, values);
         
         res.json({ mensaje: 'Paciente actualizado con éxito.' });
@@ -1476,7 +1567,7 @@ async function copiarPacienteAutorizado(client, sourcePatientId, destinationClin
     }
 
     const destino = destinoRes.rows[0];
-    const codigo = await generarCodigoPacienteParaClinica(client, destino, origen.especie);
+    const codigoGenerado = await generarCodigoPacienteParaClinica(client, destino, origen.especie);
     const includeTutor = permissions.includeTutorData || permissions.includeFullHistory;
     const includeObs = permissions.includeObservations || permissions.includeFullHistory;
     const includePhotos = permissions.includePhotos || permissions.includeFullHistory;
@@ -1485,13 +1576,14 @@ async function copiarPacienteAutorizado(client, sourcePatientId, destinationClin
         `INSERT INTO mascotas (
             codigo, veterinaria_iniciales, veterinaria_id, nombre, especie, raza, sexo,
             fecha_nacimiento, color, peso, foto_base64, tutor_nombre, tutor_telefono,
-            tutor_direccion, observaciones, source_veterinaria_id, source_mascota_id,
-            received_by_transfer, transfer_request_id, transfer_status
+            tutor_email, tutor_direccion, observaciones, source_veterinaria_id, source_mascota_id,
+            source_patient_code, received_by_transfer, transfer_request_id, transfer_status,
+            code_species, code_date, code_counter
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, TRUE, $18, 'received')
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, TRUE, $20, 'received', $21, $22, $23)
          RETURNING id`,
         [
-            codigo,
+            codigoGenerado.codigo,
             destino.iniciales,
             destinationClinicId,
             origen.nombre,
@@ -1504,11 +1596,16 @@ async function copiarPacienteAutorizado(client, sourcePatientId, destinationClin
             includePhotos ? (origen.foto_base64 || '') : '',
             includeTutor ? origen.tutor_nombre : 'Dato reservado',
             includeTutor ? (origen.tutor_telefono || '') : '',
+            includeTutor ? (origen.tutor_email || '') : '',
             includeTutor ? (origen.tutor_direccion || '') : '',
             includeObs ? (origen.observaciones || '') : '',
             origen.veterinaria_id,
             origen.id,
-            transferId
+            origen.codigo,
+            transferId,
+            codigoGenerado.codeSpecies,
+            codigoGenerado.codeDate,
+            codigoGenerado.codeCounter
         ]
     );
 
@@ -1552,6 +1649,30 @@ async function copiarPacienteAutorizado(client, sourcePatientId, destinationClin
          WHERE transfer_request_id = $2 AND source_patient_id = $3`,
         [nuevoId, transferId, sourcePatientId]
     );
+    await registrarAuditoria(client, {
+        transferId,
+        action: 'patient_copied',
+        actorClinicId: destinationClinicId,
+        details: {
+            sourcePatientId,
+            copiedPatientId: nuevoId,
+            patientCode: codigoGenerado.codigo,
+            sourcePatientCode: origen.codigo
+        }
+    });
+    await registrarAuditoria(client, {
+        transferId,
+        action: 'patient_code_generated',
+        actorClinicId: destinationClinicId,
+        details: {
+            patientId: nuevoId,
+            patientCode: codigoGenerado.codigo,
+            codeSpecies: codigoGenerado.codeSpecies,
+            codeDate: codigoGenerado.codeDate,
+            codeCounter: codigoGenerado.codeCounter,
+            sourcePatientCode: origen.codigo
+        }
+    });
     return nuevoId;
 }
 
@@ -1951,6 +2072,7 @@ app.get('/api/transferencias/:id([0-9a-fA-F-]{36})/coincidencias', authMiddlewar
             if (s.patientName && norm(row.nombre).includes(norm(s.patientName))) score += 20;
             if (s.tutorName && norm(row.tutor_nombre).includes(norm(s.tutorName))) score += 15;
             if (s.tutorPhone && norm(row.tutor_telefono).includes(norm(s.tutorPhone))) score += 25;
+            if (s.tutorEmail && normalizarEmail(row.tutor_email).includes(normalizarEmail(s.tutorEmail))) score += 25;
             if (s.species && norm(row.especie) === norm(s.species)) score += 8;
             if (s.breed && norm(row.raza).includes(norm(s.breed))) score += 7;
             const level = score >= 50 ? 'alta' : score >= 25 ? 'media' : 'baja';
@@ -1961,7 +2083,7 @@ app.get('/api/transferencias/:id([0-9a-fA-F-]{36})/coincidencias', authMiddlewar
                 especie: row.especie,
                 raza: row.raza || '',
                 sexo: row.sexo,
-                tutor: { nombre: row.tutor_nombre, telefono: row.tutor_telefono || '' },
+                tutor: { nombre: row.tutor_nombre, telefono: row.tutor_telefono || '', email: row.tutor_email || '' },
                 score,
                 level
             };
@@ -2101,6 +2223,7 @@ app.post('/api/transferencias/:id([0-9a-fA-F-]{36})/rechazar', authMiddleware, a
  * Iniciar transferencia
  */
 app.post('/api/transferencias/iniciar', authMiddleware, async (req, res) => {
+    return res.status(410).json({ error: 'La transferencia por codigo fue reemplazada por el modulo Transferencia.' });
     const { mascotaId } = req.body;
     if (!mascotaId) return res.status(400).json({ error: 'ID de mascota es requerido.' });
     
@@ -2136,6 +2259,7 @@ app.post('/api/transferencias/iniciar', authMiddleware, async (req, res) => {
  * Completar transferencia
  */
 app.post('/api/transferencias/completar', authMiddleware, async (req, res) => {
+    return res.status(410).json({ error: 'La recepcion por codigo fue reemplazada por el Buzon de Transferencia.' });
     const { codigo } = req.body;
     if (!codigo) return res.status(400).json({ error: 'El código de transferencia es requerido.' });
     

@@ -225,8 +225,8 @@
                     <p>Resumen clínico preventivo e indicadores clave</p>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button class="btn btn-secondary no-print" onclick="abrirModalTransferencia()" aria-label="Recibir mascota transferida">
-                        <span>📥</span> Recibir Transferencia
+                    <button class="btn btn-secondary no-print" onclick="abrirModalTransferencia()" aria-label="Abrir buzon de transferencia">
+                        <span>⇄</span> Buzon de Transferencia
                     </button>
                     <button class="btn btn-primary" onclick="navegarA('registrarMascota')" aria-label="Crear nuevo expediente de mascota">
                         <span>➕</span> Registrar Mascota
@@ -340,6 +340,10 @@
                         <div class="form-group">
                             <label for="vet-telefono">Teléfono de Contacto</label>
                             <input type="tel" id="vet-telefono" class="form-control" placeholder="Ej. +56 9 1234 5678">
+                        </div>
+                        <div class="form-group">
+                            <label for="vet-email">Correo de Contacto</label>
+                            <input type="email" id="vet-email" class="form-control" placeholder="Ej. contacto@veterinaria.com" autocomplete="email">
                         </div>
                         <div class="form-group form-group-full">
                             <label for="vet-direccion">Dirección</label>
@@ -621,7 +625,6 @@
                 <h2 id="pet-form-title" class="form-title">Registrar Nueva Mascota</h2>
                 <div class="module-tabs" role="tablist" aria-label="Opciones de registro">
                     <button class="filter-btn register-tab active" data-register-view="mascota" type="button">Registrar mascota</button>
-                    <button class="filter-btn register-tab" data-register-view="rapido" type="button">Registro rapido</button>
                     <button class="filter-btn register-tab" data-register-view="preventiva" type="button">Atencion preventiva</button>
                     <button class="filter-btn register-tab" data-register-view="importar" type="button">Importar pacientes</button>
                 </div>
@@ -693,6 +696,10 @@
                             <label for="pet-tutor-tel">Teléfono del Tutor</label>
                             <input type="tel" id="pet-tutor-tel" class="form-control" placeholder="Ej. +56 9 8765 4321">
                         </div>
+                        <div class="form-group">
+                            <label for="pet-tutor-email">Correo del Tutor</label>
+                            <input type="email" id="pet-tutor-email" class="form-control" placeholder="Ej. tutor@email.com" autocomplete="email">
+                        </div>
                         <div class="form-group form-group-full">
                             <label for="pet-tutor-dir">Dirección del Tutor</label>
                             <input type="text" id="pet-tutor-dir" class="form-control" placeholder="Ej. Pasaje Central #543">
@@ -709,20 +716,6 @@
                         <button type="submit" class="btn btn-primary">Guardar Paciente</button>
                     </div>
                 </form>
-                <div class="register-panel prepared-panel" data-register-panel="rapido">
-                    <h3>Registro rapido para campanas</h3>
-                    <div class="form-grid">
-                        <div class="form-group"><label>Tutor</label><input class="form-control" type="text" placeholder="Nombre del tutor"></div>
-                        <div class="form-group"><label>Telefono</label><input class="form-control" type="tel" placeholder="Telefono de contacto"></div>
-                        <div class="form-group"><label>Mascota</label><input class="form-control" type="text" placeholder="Nombre de la mascota"></div>
-                        <div class="form-group"><label>Especie</label><select class="form-control"><option>Canino</option><option>Felino</option></select></div>
-                        <div class="form-group"><label>Sexo</label><select class="form-control"><option>Macho</option><option>Hembra</option></select></div>
-                        <div class="form-group"><label>Raza</label><input class="form-control" type="text" placeholder="Raza o mestizo"></div>
-                        <div class="form-group form-group-full"><label>Vacuna o desparasitacion aplicada</label><input class="form-control" type="text" placeholder="Producto aplicado"></div>
-                        <div class="form-group"><label>Fecha de proxima atencion</label><input class="form-control" type="date"></div>
-                    </div>
-                    <p class="prepared-note">Preparado para guardar en lote cuando se habilite la tabla/carga masiva correspondiente.</p>
-                </div>
                 <div class="register-panel prepared-panel" data-register-panel="preventiva">
                     <h3>Registrar atencion preventiva</h3>
                     <div class="prepared-actions">
@@ -780,8 +773,8 @@
                     <span>⬅️</span> Volver a Pacientes
                 </button>
                 <div style="display:flex; gap:8px; flex-wrap: wrap;">
-                    <button class="btn btn-secondary no-print no-public" onclick="iniciarTransferenciaMascota()" aria-label="Iniciar transferencia de paciente">
-                        🔄 Transferir
+                    <button class="btn btn-secondary no-print no-public" onclick="iniciarTransferenciaMascota()" aria-label="Enviar paciente por transferencia">
+                        ⇄ Enviar por Transferencia
                     </button>
                     <button class="btn btn-secondary no-print no-public" onclick="copiarEnlaceCartilla()" aria-label="Copiar link público de la cartilla">
                         🔗 Copiar Enlace
@@ -807,6 +800,7 @@
                 <div class="cartilla-code-badge">
                     <div class="cartilla-code-lbl">Código Ficha Digital</div>
                     <div class="cartilla-code-num" id="cartilla-unique-code">CD-0000-00</div>
+                    <div class="cartilla-source-code" id="cartilla-source-code" hidden>Codigo origen: <span></span></div>
                 </div>
             </div>
 
