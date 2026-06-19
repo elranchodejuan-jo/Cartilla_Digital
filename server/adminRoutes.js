@@ -287,14 +287,15 @@ router.get('/tutors', async (req, res) => {
     try {
         const result = await db.query(`
             SELECT MIN(m.id)::text AS id, m.veterinaria_id AS clinica_id, v.nombre AS clinica,
-                   COALESCE(NULLIF(TRIM(m.tutor_nombre), ''), 'Sin tutor') AS nombre,
-                   MAX(m.tutor_telefono) AS telefono,
-                   MAX(m.tutor_email) AS email,
-                   MAX(m.tutor_direccion) AS direccion,
+                   COALESCE(MAX(NULLIF(TRIM(m.tutor_nombre), '')), 'Sin tutor') AS nombre,
+                   COALESCE(MAX(NULLIF(TRIM(m.tutor_telefono), '')), '') AS telefono,
+                   COALESCE(MAX(NULLIF(TRIM(m.tutor_email), '')), '') AS email,
+                   COALESCE(MAX(NULLIF(TRIM(m.tutor_direccion), '')), '') AS direccion,
                    COUNT(m.id)::int AS mascotas,
                    MIN(m.fecha_registro) AS fecha_registro,
                    CASE
-                       WHEN COALESCE(MAX(m.tutor_telefono), '') = '' OR COALESCE(MAX(m.tutor_email), '') = '' THEN 'incompleto'
+                       WHEN COALESCE(MAX(NULLIF(TRIM(m.tutor_telefono), '')), '') = ''
+                         OR COALESCE(MAX(NULLIF(TRIM(m.tutor_email), '')), '') = '' THEN 'incompleto'
                        ELSE 'completo'
                    END AS estado_datos
             FROM mascotas m
