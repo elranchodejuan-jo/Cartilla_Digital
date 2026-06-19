@@ -14,6 +14,7 @@
         tutors: 'Tutores',
         plans: 'Planes',
         payments: 'Pagos',
+        usage: 'Metricas de uso',
         trials: 'Pruebas gratis',
         feedback: 'Comentarios / Reportes',
         support: 'Soporte tecnico',
@@ -132,7 +133,12 @@
             if (state.view === 'patients') return renderPatients(await load('patients', () => AdminService.getPatients()));
             if (state.view === 'tutors') return renderTutors(await load('tutors', () => AdminService.getTutors()));
             if (state.view === 'plans') return renderPlans(await load('plans', () => AdminService.getPlans()));
-            if (state.view === 'feedback') return renderFeedback(await load('feedback', () => AdminService.getFeedback()));
+            if (state.view === 'payments') return renderPayments(
+                await load('payments', () => AdminService.getPayments()),
+                await load('clinics', () => AdminService.getClinics())
+            );
+            if (state.view === 'usage') return renderUsage(await load('usage', () => AdminService.getUsageMetrics()));
+            if (state.view === 'feedback') return renderTickets(await load('tickets', () => AdminService.getTickets()));
             if (state.view === 'support') return renderSupport(await load('support', () => AdminService.getSupportUsers()));
             if (state.view === 'activity') return renderActivity(await load('activity', () => AdminService.getActivity()));
             if (state.view === 'alerts') return renderAlerts(await load('alerts', () => AdminService.getAlerts()));
@@ -299,6 +305,139 @@
         ], { search: true, filterField: 'status' });
     }
 
+    function renderTickets(rows) {
+        renderTableView('Gestion avanzada de tickets', rows, [
+            col('Solicitud', row => mainCell(row.subject, row.message)),
+            col('Clinica', row => mainCell(row.clinica, row.clinic_email)),
+            col('Tipo', row => badge(labelTicket(row.type))),
+            col('Prioridad', row => badge(row.priority || 'media')),
+            col('Modulo', row => row.related_module || 'otro'),
+            col('Tiempo abierto', row => formatOpenTime(row.open_seconds)),
+            col('Estado', row => `
+                <select class="admin-select" data-action="ticket-status" data-id="${escapeAttr(row.id)}">
+                    ${ticketOption('enviado', row.status)}${ticketOption('recibido', row.status)}${ticketOption('revisado', row.status)}${ticketOption('en_proceso', row.status)}${ticketOption('en_desarrollo', row.status)}${ticketOption('solucionado', row.status)}${ticketOption('rechazado', row.status)}${ticketOption('cerrado', row.status)}
+                </select>
+            `),
+            col('Respuesta', row => `
+                <div class="admin-ticket-actions">
+                    <span class="admin-muted">${escapeHtml(row.admin_response || 'Sin respuesta')}</span>
+                    <button class="admin-action" data-action="ticket-reply" data-id="${escapeAttr(row.id)}">Responder</button>
+                </div>
+            `)
+        ], { search: true, filterField: 'status' });
+    }
+
+    function renderPayments(data, clinics) {
+        const stats = data.stats || {};
+        const payments = data.payments || [];
+        getView().innerHTML = `
+            <div class="admin-grid stats">
+                ${stat('Ingresos del mes', money(stats.ingresos_mes), 'Pagos verificados')}
+                ${stat('Ingresos semana', money(stats.ingresos_semana), 'Semana actual')}
+                ${stat('Pagos pendientes', stats.pagos_pendientes, 'Requieren revision')}
+                ${stat('Pagos vencidos', stats.pagos_vencidos, 'Seguimiento financiero')}
+                ${stat('Plan mas vendido', stats.plan_mas_vendido || 'Sin datos', 'Historico de pagos')}
+                ${stat('Clinicas al dia', stats.clinicas_al_dia, 'Con pagos registrados')}
+            </div>
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <h2>Registrar pago manual</h2>
+                    <span class="admin-muted">Pasarela futura preparada</span>
+                </div>
+                <div class="admin-panel-body">
+                    <form class="admin-payment-form" id="admin-payment-form">
+                        <select class="admin-select" name="clinicId" required>
+                            <option value="">Seleccionar clinica</option>
+                            ${(clinics || []).map(clinic => `<option value="${escapeAttr(clinic.id)}">${escapeHtml(clinic.nombre)} · ${escapeHtml(clinic.email || '')}</option>`).join('')}
+                        </select>
+                        <input class="admin-input" name="planName" placeholder="Plan" value="Pro">
+                        <input class="admin-input" name="amount" type="number" min="0" step="0.01" placeholder="Monto">
+                        <select class="admin-select" name="paymentStatus">
+                            ${option('manual', 'manual')}${option('pagado')}${option('pendiente')}${option('verificado')}${option('vencido')}${option('fallido')}${option('reembolsado')}
+                        </select>
+                        <input class="admin-input" name="reference" placeholder="Referencia">
+                        <input class="admin-input" name="notes" placeholder="Observacion">
+                        <button class="admin-action primary" type="submit">Registrar pago</button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        const tableHtml = table([
+            col('Clinica', row => mainCell(row.clinica, row.clinic_email)),
+            col('Plan', row => row.plan_name || 'Sin plan'),
+            col('Monto', row => money(row.amount, row.currency)),
+            col('Metodo', row => row.payment_method || 'manual'),
+            col('Estado', row => `
+                <select class="admin-select" data-action="payment-status" data-id="${escapeAttr(row.id)}">
+                    ${option('manual', row.payment_status)}${option('pagado', row.payment_status)}${option('pendiente', row.payment_status)}${option('verificado', row.payment_status)}${option('vencido', row.payment_status)}${option('fallido', row.payment_status)}${option('reembolsado', row.payment_status)}
+                </select>
+            `),
+            col('Fecha', row => formatDate(row.payment_date || row.created_at)),
+            col('Referencia', row => row.reference || 'Sin referencia'),
+            col('Observacion', row => row.notes || '')
+        ], payments);
+
+        getView().insertAdjacentHTML('beforeend', panel('Historial de pagos', tableHtml));
+
+        const form = document.getElementById('admin-payment-form');
+        if (form) {
+            form.addEventListener('submit', async event => {
+                event.preventDefault();
+                const formData = new FormData(form);
+                const payload = Object.fromEntries(formData.entries());
+                try {
+                    await AdminService.createManualPayment(payload);
+                    state.data.payments = null;
+                    state.data.summary = null;
+                    toast('Pago manual registrado.');
+                    await renderActiveView();
+                } catch (err) {
+                    toast(err.message, 'error');
+                }
+            });
+        }
+    }
+
+    function renderUsage(data) {
+        const summary = data.summary || {};
+        getView().innerHTML = `
+            <div class="admin-grid stats">
+                ${stat('Clinicas activas hoy', summary.clinicas_hoy, 'Ultimo login hoy')}
+                ${stat('Clinicas activas semana', summary.clinicas_semana, 'Semana actual')}
+                ${stat('Clinicas activas mes', summary.clinicas_mes, 'Mes actual')}
+                ${stat('Pacientes hoy', summary.pacientes_hoy, 'Nuevos registros')}
+                ${stat('Pacientes semana', summary.pacientes_semana, 'Nuevos registros')}
+                ${stat('Tickets enviados', summary.tickets_enviados, 'Soporte clinicas')}
+                ${stat('Vacunas', summary.vacunas_registradas, 'Registros totales')}
+                ${stat('Controles', summary.controles_preventivos, 'Preventivos totales')}
+            </div>
+        `;
+
+        const clinicRows = data.clinicUsage || [];
+        getView().insertAdjacentHTML('beforeend', panel('Uso por clinica', table([
+            col('Clinica', row => mainCell(row.clinica, row.plan_actual)),
+            col('Pacientes', row => value(row.pacientes)),
+            col('Vacunas', row => value(row.vacunas)),
+            col('Desparasitaciones', row => value(row.desparasitaciones)),
+            col('Controles', row => value(row.controles)),
+            col('Tickets', row => value(row.tickets)),
+            col('Banco', row => value(row.banco_vacunas)),
+            col('Ultima actividad', row => formatDate(row.ultimo_login, true) || 'Sin login')
+        ], clinicRows)));
+
+        getView().insertAdjacentHTML('beforeend', `
+            <div class="admin-grid two">
+                ${listPanel('Clinicas mas activas', data.mostActiveClinics || [], row => `
+                    <li><div><strong>${escapeHtml(row.clinica)}</strong><br><span class="admin-muted">${formatDate(row.ultimo_login, true) || 'Sin login'}</span></div>${badge(row.plan_actual || 'Free')}</li>
+                `)}
+                ${listPanel('Clinicas inactivas', data.inactiveClinics || [], row => `
+                    <li><div><strong>${escapeHtml(row.clinica)}</strong><br><span class="admin-muted">${formatDate(row.ultimo_login, true) || 'Sin login reciente'}</span></div>${badge(row.plan_actual || 'Free')}</li>
+                `)}
+            </div>
+        `);
+    }
+
     function renderSupport(rows) {
         renderTableView('Soporte tecnico', rows, [
             col('Usuario', row => mainCell(row.propietario || row.nombre, row.email)),
@@ -421,7 +560,10 @@
     }
 
     function stat(label, number, note) {
-        return `<article class="admin-card"><small>${escapeHtml(label)}</small><strong>${value(number)}</strong><span>${escapeHtml(note || '')}</span></article>`;
+        const display = Number.isFinite(Number(number)) && String(number).trim() !== ''
+            ? value(number)
+            : escapeHtml(number);
+        return `<article class="admin-card"><small>${escapeHtml(label)}</small><strong>${display}</strong><span>${escapeHtml(note || '')}</span></article>`;
     }
 
     function listPanel(title, rows, renderItem) {
@@ -453,6 +595,42 @@
         const valueString = String(valueOption);
         const isSelected = String(selected || '').toLowerCase() === valueString.toLowerCase() ? ' selected' : '';
         return `<option value="${escapeAttr(valueString)}"${isSelected}>${escapeHtml(valueString.replace(/_/g, ' '))}</option>`;
+    }
+
+    function ticketOption(valueOption, selected) {
+        return option(valueOption, selected);
+    }
+
+    function labelTicket(valueText) {
+        const labels = {
+            problema_tecnico: 'Problema tecnico',
+            error_sistema: 'Error del sistema',
+            sugerencia: 'Sugerencia',
+            solicitud_mejora: 'Solicitud de mejora',
+            duda: 'Duda',
+            pago_plan: 'Pago / plan',
+            impresion_pdf: 'Impresion / PDF',
+            qr_cartilla_publica: 'QR / cartilla publica',
+            recordatorios: 'Recordatorios',
+            otro: 'Otro'
+        };
+        return labels[valueText] || String(valueText || 'otro').replace(/_/g, ' ');
+    }
+
+    function formatOpenTime(seconds) {
+        const total = Number(seconds) || 0;
+        const days = Math.floor(total / 86400);
+        const hours = Math.floor((total % 86400) / 3600);
+        if (days > 0) return `${days} d ${hours} h`;
+        if (hours > 0) return `${hours} h`;
+        return 'Hoy';
+    }
+
+    function money(amount, currency = 'USD') {
+        return new Intl.NumberFormat('es-EC', {
+            style: 'currency',
+            currency: currency || 'USD'
+        }).format(Number(amount) || 0);
     }
 
     async function handleActions(event) {
@@ -494,6 +672,20 @@
                 toast(err.message, 'error');
             }
         }
+
+        if (action.dataset.action === 'ticket-reply') {
+            const message = prompt('Respuesta visible para la clinica:');
+            if (!message || !message.trim()) return;
+            try {
+                await AdminService.updateTicket(action.dataset.id, { adminResponse: message.trim(), status: 'revisado' });
+                state.data.tickets = null;
+                state.data.summary = null;
+                toast('Respuesta enviada a la clinica.');
+                await renderActiveView();
+            } catch (err) {
+                toast(err.message, 'error');
+            }
+        }
     }
 
     async function handleChanges(event) {
@@ -504,6 +696,29 @@
                 state.data.feedback = null;
                 state.data.summary = null;
                 toast('Comentario actualizado.');
+            } catch (err) {
+                toast(err.message, 'error');
+            }
+        }
+
+        if (target.dataset.action === 'ticket-status') {
+            try {
+                await AdminService.updateTicket(target.dataset.id, { status: target.value });
+                state.data.tickets = null;
+                state.data.summary = null;
+                state.data.alerts = null;
+                toast('Estado de ticket actualizado.');
+            } catch (err) {
+                toast(err.message, 'error');
+            }
+        }
+
+        if (target.dataset.action === 'payment-status') {
+            try {
+                await AdminService.updatePayment(target.dataset.id, { paymentStatus: target.value });
+                state.data.payments = null;
+                state.data.summary = null;
+                toast('Estado de pago actualizado.');
             } catch (err) {
                 toast(err.message, 'error');
             }

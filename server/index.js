@@ -2821,6 +2821,197 @@ app.delete('/api/banco/externos/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// ==========================================
+// SOPORTE / COMENTARIOS DE CLINICAS
+// ==========================================
+
+const SOPORTE_TIPOS = new Set([
+    'problema_tecnico',
+    'error_sistema',
+    'sugerencia',
+    'solicitud_mejora',
+    'duda',
+    'pago_plan',
+    'impresion_pdf',
+    'qr_cartilla_publica',
+    'recordatorios',
+    'otro'
+]);
+
+const SOPORTE_PRIORIDADES = new Set(['baja', 'media', 'alta', 'urgente']);
+
+async function registrarActividadSistema(req, action, module, description, metadata = {}, level = 'info') {
+    try {
+        await db.query(
+            `INSERT INTO activity_logs (actor_user_id, actor_email, clinic_id, action, module, description, metadata, level)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+                req.veterinaria.id,
+                req.veterinaria.email,
+                req.veterinaria.id,
+                action,
+                module,
+                description,
+                JSON.stringify(metadata || {}),
+                level
+            ]
+        );
+    } catch (err) {
+        console.warn('No se pudo registrar actividad:', err.message);
+    }
+}
+
+function validarTicketPayload(body) {
+    const subject = textoLimpio(body.subject || body.asunto);
+    const message = textoLimpio(body.message || body.mensaje);
+    const type = textoLimpio(body.type || body.tipo || 'otro');
+    const priority = textoLimpio(body.priority || body.prioridad || 'media');
+    const relatedModule = textoLimpio(body.relatedModule || body.related_module || body.moduloRelacionado || 'otro');
+    const attachmentUrl = textoLimpio(body.attachmentUrl || body.attachment_url);
+
+    if (!subject) return { error: 'El asunto es obligatorio.' };
+    if (!message) return { error: 'El mensaje es obligatorio.' };
+    if (!SOPORTE_TIPOS.has(type)) return { error: 'Tipo de solicitud no valido.' };
+    if (!SOPORTE_PRIORIDADES.has(priority)) return { error: 'Prioridad no valida.' };
+
+    return { subject, message, type, priority, relatedModule, attachmentUrl };
+}
+
+app.get('/api/support/tickets', authMiddleware, async (req, res) => {
+    try {
+        const result = await db.query(
+            `SELECT t.id, t.subject, t.message, t.type, t.priority, t.status, t.related_module,
+                    t.admin_response, t.attachment_url, t.created_at, t.updated_at,
+                    t.resolved_at, t.closed_at,
+                    (SELECT MAX(created_at) FROM support_ticket_messages m WHERE m.ticket_id = t.id) AS last_message_at
+             FROM support_tickets t
+             WHERE t.clinic_id = $1
+             ORDER BY t.updated_at DESC, t.created_at DESC`,
+            [req.veterinaria.id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error al obtener tickets de soporte:', err);
+        res.status(500).json({ error: 'Error al obtener solicitudes de soporte.' });
+    }
+});
+
+app.post('/api/support/tickets', authMiddleware, async (req, res) => {
+    const payload = validarTicketPayload(req.body);
+    if (payload.error) return res.status(400).json({ error: payload.error });
+
+    const client = await db.pool.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await client.query(
+            `INSERT INTO support_tickets (clinic_id, user_id, subject, message, type, priority, related_module, attachment_url, metadata)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING id, subject, message, type, priority, status, related_module, admin_response, attachment_url, created_at, updated_at`,
+            [
+                req.veterinaria.id,
+                req.veterinaria.id,
+                payload.subject,
+                payload.message,
+                payload.type,
+                payload.priority,
+                payload.relatedModule,
+                payload.attachmentUrl || null,
+                JSON.stringify({ createdFrom: 'clinic_support_page' })
+            ]
+        );
+        const ticket = result.rows[0];
+        await client.query(
+            `INSERT INTO support_ticket_status_history (ticket_id, previous_status, new_status, changed_by, note)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [ticket.id, null, 'enviado', req.veterinaria.id, 'Solicitud enviada por la clinica.']
+        );
+        await client.query(
+            `INSERT INTO support_ticket_messages (ticket_id, sender_user_id, sender_role, message)
+             VALUES ($1, $2, $3, $4)`,
+            [ticket.id, req.veterinaria.id, 'clinic', payload.message]
+        );
+        await client.query('COMMIT');
+
+        await registrarActividadSistema(req, 'ticket_created', 'support', 'La clinica envio una solicitud de soporte.', {
+            ticketId: ticket.id,
+            type: ticket.type,
+            priority: ticket.priority
+        }, ticket.priority === 'urgente' ? 'warning' : 'info');
+
+        res.status(201).json({ mensaje: 'Solicitud enviada correctamente.', ticket });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error al crear ticket de soporte:', err);
+        res.status(500).json({ error: 'Error al enviar la solicitud de soporte.' });
+    } finally {
+        client.release();
+    }
+});
+
+app.get('/api/support/tickets/:id', authMiddleware, async (req, res) => {
+    try {
+        const ticketRes = await db.query(
+            `SELECT id, subject, message, type, priority, status, related_module, admin_response,
+                    attachment_url, created_at, updated_at, resolved_at, closed_at
+             FROM support_tickets
+             WHERE id = $1 AND clinic_id = $2`,
+            [req.params.id, req.veterinaria.id]
+        );
+
+        if (ticketRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Solicitud no encontrada.' });
+        }
+
+        const [messagesRes, historyRes] = await Promise.all([
+            db.query(
+                `SELECT id, sender_role, message, attachments, created_at
+                 FROM support_ticket_messages
+                 WHERE ticket_id = $1
+                 ORDER BY created_at ASC`,
+                [req.params.id]
+            ),
+            db.query(
+                `SELECT previous_status, new_status, note, created_at
+                 FROM support_ticket_status_history
+                 WHERE ticket_id = $1
+                 ORDER BY created_at ASC`,
+                [req.params.id]
+            )
+        ]);
+
+        res.json({ ...ticketRes.rows[0], messages: messagesRes.rows, statusHistory: historyRes.rows });
+    } catch (err) {
+        console.error('Error al obtener detalle de ticket:', err);
+        res.status(500).json({ error: 'Error al obtener el detalle de la solicitud.' });
+    }
+});
+
+app.post('/api/support/tickets/:id/messages', authMiddleware, async (req, res) => {
+    const message = textoLimpio(req.body.message || req.body.mensaje);
+    if (!message) return res.status(400).json({ error: 'El mensaje es obligatorio.' });
+
+    try {
+        const ticketRes = await db.query(
+            `SELECT id FROM support_tickets WHERE id = $1 AND clinic_id = $2`,
+            [req.params.id, req.veterinaria.id]
+        );
+        if (ticketRes.rows.length === 0) return res.status(404).json({ error: 'Solicitud no encontrada.' });
+
+        const result = await db.query(
+            `INSERT INTO support_ticket_messages (ticket_id, sender_user_id, sender_role, message)
+             VALUES ($1, $2, 'clinic', $3)
+             RETURNING id, sender_role, message, attachments, created_at`,
+            [req.params.id, req.veterinaria.id, message]
+        );
+        await db.query('UPDATE support_tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [req.params.id]);
+        await registrarActividadSistema(req, 'ticket_message_created', 'support', 'La clinica agrego un mensaje al ticket.', { ticketId: req.params.id });
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error al agregar mensaje de ticket:', err);
+        res.status(500).json({ error: 'Error al agregar el mensaje.' });
+    }
+});
+
 
 /**
  * Endpoint para subir una imagen desde el frontend

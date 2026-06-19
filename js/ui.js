@@ -51,7 +51,8 @@ const DOM = {
         cartilla: document.getElementById('section-cartilla'),
         banco: document.getElementById('section-banco'),
         transferencia: document.getElementById('section-transferencia'),
-        equipo: document.getElementById('section-equipo')
+        equipo: document.getElementById('section-equipo'),
+        soporte: document.getElementById('section-soporte')
     },
     navButtons: document.querySelectorAll('.nav-btn'),
     stats: {
@@ -478,6 +479,9 @@ async function navegarA(seccionId) {
         cambiarVistaRegistro(UIState.registerView || 'mascota');
     } else if (seccionId === 'banco') {
         cambiarPestañaBanco(bancoPestañaActiva);
+    }
+    if (seccionId === 'soporte' && typeof renderizarSoporteClinica === 'function') {
+        await renderizarSoporteClinica();
     }
     if (seccionId === 'transferencia' && typeof renderizarTransferencias === 'function') {
         await renderizarTransferencias();

@@ -581,6 +581,40 @@ const API = {
     },
 
     // --- RUTA PÚBLICA (QR) ---
+    async obtenerTicketsSoporte() {
+        const res = await fetch(`${API_BASE_URL}/support/tickets`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async crearTicketSoporte(datos) {
+        const res = await fetch(`${API_BASE_URL}/support/tickets`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
+    async obtenerTicketSoporte(id) {
+        const res = await fetch(`${API_BASE_URL}/support/tickets/${encodeURIComponent(id)}`, {
+            method: 'GET',
+            headers: this.getHeaders(true)
+        });
+        return this.handleResponse(res);
+    },
+
+    async agregarMensajeTicketSoporte(id, message) {
+        const res = await fetch(`${API_BASE_URL}/support/tickets/${encodeURIComponent(id)}/messages`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ message })
+        });
+        return this.handleResponse(res);
+    },
+
     async obtenerMascotaPublica(id) {
         const res = await fetch(`${API_BASE_URL}/public/mascotas/${id}`, {
             method: 'GET',

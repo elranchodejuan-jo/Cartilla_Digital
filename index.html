@@ -55,6 +55,11 @@
                 <span class="nav-icon">🩺</span>
                 <span class="nav-text">Equipo</span>
             </button>
+            <button class="nav-btn" data-section="soporte">
+                <span class="nav-icon">?</span>
+                <span class="nav-text">Soporte / Comentarios</span>
+                <span id="support-nav-badge" class="nav-badge" hidden>0</span>
+            </button>
             <button class="nav-btn no-print" id="nav-btn-logout" onclick="cerrarSesionClinica()" style="color: var(--danger); display: none;">
                 <span class="nav-icon">🚪</span>
                 <span class="nav-text">Salir</span>
@@ -620,6 +625,12 @@
 
 
         <!-- ================= MÓDULO 3: REGISTRO / EDICIÓN DE MASCOTA ================= -->
+        <section id="section-soporte" class="app-section" aria-labelledby="support-page-title">
+            <div id="support-root" class="support-root">
+                <div class="support-empty">Cargando soporte...</div>
+            </div>
+        </section>
+
         <section id="section-registrar-mascota" class="app-section" aria-labelledby="pet-form-title">
             <div class="form-card">
                 <h2 id="pet-form-title" class="form-title">Registrar Nueva Mascota</h2>
@@ -1728,6 +1739,7 @@
     <script src="js/banco.js"></script>
     <script src="js/equipo.js"></script>
     <script src="js/transferencias.js"></script>
+    <script src="js/support.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/app.js?v=admin-route-20260619"></script>
 </body>

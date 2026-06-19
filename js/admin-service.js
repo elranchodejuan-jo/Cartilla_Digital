@@ -59,6 +59,39 @@ const AdminService = {
         });
     },
 
+    getTickets() {
+        return this.request('/tickets');
+    },
+
+    updateTicket(id, data) {
+        return this.request(`/tickets/${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data)
+        });
+    },
+
+    getPayments() {
+        return this.request('/payments');
+    },
+
+    createManualPayment(data) {
+        return this.request('/payments', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
+    updatePayment(id, data) {
+        return this.request(`/payments/${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data)
+        });
+    },
+
+    getUsageMetrics() {
+        return this.request('/usage-metrics');
+    },
+
     getSupportUsers() {
         return this.request('/support-users');
     },

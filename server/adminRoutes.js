@@ -4,6 +4,9 @@ const authMiddleware = require('./authMiddleware');
 
 const router = express.Router();
 
+const TICKET_ESTADOS = new Set(['enviado', 'recibido', 'revisado', 'en_proceso', 'en_desarrollo', 'solucionado', 'rechazado', 'cerrado']);
+const PAYMENT_STATUS = new Set(['pagado', 'pendiente', 'fallido', 'vencido', 'reembolsado', 'manual', 'verificado']);
+
 function fechaSql(date = new Date()) {
     return date.toISOString().slice(0, 10);
 }
@@ -115,8 +118,10 @@ router.get('/summary', async (req, res) => {
                 ) t
             `),
             db.query(`
-                SELECT COUNT(*) FILTER (WHERE status IN ('nuevo', 'en_revision'))::int AS nuevos
-                FROM admin_feedback
+                SELECT (
+                    (SELECT COUNT(*) FROM admin_feedback WHERE status IN ('nuevo', 'en_revision')) +
+                    (SELECT COUNT(*) FROM support_tickets WHERE status IN ('enviado', 'recibido', 'revisado'))
+                )::int AS nuevos
             `),
             db.query(`
                 SELECT
@@ -381,6 +386,279 @@ router.patch('/feedback/:id', async (req, res) => {
     }
 });
 
+router.get('/tickets', async (req, res) => {
+    try {
+        const result = await db.query(`
+            SELECT t.id, t.subject, t.message, t.type, t.priority, t.status, t.related_module,
+                   t.admin_response, t.admin_notes, t.attachment_url, t.assigned_to,
+                   t.created_at, t.updated_at, t.resolved_at, t.closed_at,
+                   v.nombre AS clinica, v.email AS clinic_email, v.id AS clinic_id,
+                   u.email AS assigned_email,
+                   EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - t.created_at))::int AS open_seconds
+            FROM support_tickets t
+            JOIN veterinarias v ON v.id = t.clinic_id
+            LEFT JOIN veterinarias u ON u.id = t.assigned_to
+            ORDER BY
+                CASE t.priority WHEN 'urgente' THEN 1 WHEN 'alta' THEN 2 WHEN 'media' THEN 3 ELSE 4 END,
+                t.updated_at DESC,
+                t.created_at DESC
+            LIMIT 500
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error cargando tickets admin:', err);
+        res.status(500).json({ error: 'No se pudieron cargar los tickets de soporte.' });
+    }
+});
+
+router.patch('/tickets/:id', async (req, res) => {
+    const { status, adminResponse, adminNotes, assignedTo, note } = req.body;
+    if (status && !TICKET_ESTADOS.has(status)) {
+        return res.status(400).json({ error: 'Estado de ticket no valido.' });
+    }
+
+    const client = await db.pool.connect();
+    try {
+        await client.query('BEGIN');
+        const current = await client.query('SELECT * FROM support_tickets WHERE id = $1 FOR UPDATE', [req.params.id]);
+        if (current.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Ticket no encontrado.' });
+        }
+
+        const previous = current.rows[0];
+        const newStatus = status || previous.status;
+        const resolvedAtSql = newStatus === 'solucionado' && previous.status !== 'solucionado'
+            ? 'CURRENT_TIMESTAMP'
+            : 'resolved_at';
+        const closedAtSql = newStatus === 'cerrado' && previous.status !== 'cerrado'
+            ? 'CURRENT_TIMESTAMP'
+            : 'closed_at';
+
+        const result = await client.query(
+            `UPDATE support_tickets
+             SET status = $1,
+                 admin_response = COALESCE($2, admin_response),
+                 admin_notes = COALESCE($3, admin_notes),
+                 assigned_to = COALESCE($4, assigned_to),
+                 updated_at = CURRENT_TIMESTAMP,
+                 resolved_at = ${resolvedAtSql},
+                 closed_at = ${closedAtSql}
+             WHERE id = $5
+             RETURNING *`,
+            [newStatus, adminResponse || null, adminNotes || null, assignedTo || null, req.params.id]
+        );
+
+        if (newStatus !== previous.status) {
+            await client.query(
+                `INSERT INTO support_ticket_status_history (ticket_id, previous_status, new_status, changed_by, note)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [req.params.id, previous.status, newStatus, req.veterinaria.id, note || 'Cambio realizado desde Admin Center.']
+            );
+        }
+
+        if (adminResponse && adminResponse !== previous.admin_response) {
+            await client.query(
+                `INSERT INTO support_ticket_messages (ticket_id, sender_user_id, sender_role, message)
+                 VALUES ($1, $2, 'admin', $3)`,
+                [req.params.id, req.veterinaria.id, adminResponse]
+            );
+        }
+
+        await client.query('COMMIT');
+        await registrarActividad(req, 'ticket_admin_update', 'support', 'Actualizacion administrativa de ticket.', {
+            ticketId: req.params.id,
+            previousStatus: previous.status,
+            newStatus
+        }, previous.clinic_id, newStatus === 'rechazado' ? 'warning' : 'info');
+        res.json(result.rows[0]);
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error actualizando ticket admin:', err);
+        res.status(500).json({ error: 'No se pudo actualizar el ticket.' });
+    } finally {
+        client.release();
+    }
+});
+
+router.get('/payments', async (req, res) => {
+    try {
+        const [paymentsRes, statsRes, planRes] = await Promise.all([
+            db.query(`
+                SELECT p.id, p.clinic_id, v.nombre AS clinica, v.email AS clinic_email,
+                       p.plan_name, p.amount, p.currency, p.payment_method, p.payment_status,
+                       p.payment_date, p.period_start, p.period_end, p.reference,
+                       p.receipt_url, p.notes, p.created_at, p.updated_at
+                FROM payments p
+                JOIN veterinarias v ON v.id = p.clinic_id
+                ORDER BY COALESCE(p.payment_date, p.created_at) DESC
+                LIMIT 500
+            `),
+            db.query(`
+                SELECT
+                    COALESCE(SUM(amount) FILTER (WHERE payment_status IN ('pagado', 'verificado') AND payment_date >= date_trunc('month', CURRENT_DATE)), 0)::numeric AS ingresos_mes,
+                    COALESCE(SUM(amount) FILTER (WHERE payment_status IN ('pagado', 'verificado') AND payment_date >= date_trunc('week', CURRENT_DATE)), 0)::numeric AS ingresos_semana,
+                    COUNT(*) FILTER (WHERE payment_status = 'pendiente')::int AS pagos_pendientes,
+                    COUNT(*) FILTER (WHERE payment_status = 'vencido')::int AS pagos_vencidos,
+                    COUNT(DISTINCT clinic_id) FILTER (WHERE payment_status IN ('pagado', 'verificado'))::int AS clinicas_al_dia,
+                    COUNT(DISTINCT clinic_id) FILTER (WHERE payment_status = 'vencido')::int AS clinicas_vencidas
+                FROM payments
+            `),
+            db.query(`
+                SELECT COALESCE(plan_name, 'Sin plan') AS plan_name, COUNT(*)::int AS total
+                FROM payments
+                WHERE payment_status IN ('pagado', 'verificado')
+                GROUP BY COALESCE(plan_name, 'Sin plan')
+                ORDER BY total DESC
+                LIMIT 1
+            `)
+        ]);
+
+        res.json({
+            stats: {
+                ...statsRes.rows[0],
+                plan_mas_vendido: planRes.rows[0]?.plan_name || 'Sin datos'
+            },
+            payments: paymentsRes.rows
+        });
+    } catch (err) {
+        console.error('Error cargando pagos admin:', err);
+        res.status(500).json({ error: 'No se pudo cargar el historial de pagos.' });
+    }
+});
+
+router.post('/payments', async (req, res) => {
+    const clinicId = req.body.clinicId || req.body.clinic_id;
+    const amount = Number(req.body.amount || 0);
+    const paymentStatus = req.body.paymentStatus || req.body.payment_status || 'manual';
+
+    if (!clinicId) return res.status(400).json({ error: 'Selecciona una clinica.' });
+    if (!PAYMENT_STATUS.has(paymentStatus)) return res.status(400).json({ error: 'Estado de pago no valido.' });
+
+    try {
+        const result = await db.query(
+            `INSERT INTO payments (clinic_id, plan_name, amount, currency, payment_method, payment_status,
+                                   payment_date, period_start, period_end, reference, receipt_url, notes, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, CURRENT_TIMESTAMP), $8, $9, $10, $11, $12, $13)
+             RETURNING *`,
+            [
+                clinicId,
+                req.body.planName || req.body.plan_name || null,
+                Number.isFinite(amount) ? amount : 0,
+                req.body.currency || 'USD',
+                req.body.paymentMethod || req.body.payment_method || 'manual',
+                paymentStatus,
+                req.body.paymentDate || req.body.payment_date || null,
+                req.body.periodStart || req.body.period_start || null,
+                req.body.periodEnd || req.body.period_end || null,
+                req.body.reference || null,
+                req.body.receiptUrl || req.body.receipt_url || null,
+                req.body.notes || null,
+                req.veterinaria.id
+            ]
+        );
+        await registrarActividad(req, 'payment_manual_created', 'payments', 'Pago manual registrado desde Admin Center.', {
+            paymentId: result.rows[0].id,
+            amount: result.rows[0].amount,
+            status: result.rows[0].payment_status
+        }, clinicId);
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error creando pago manual:', err);
+        res.status(500).json({ error: 'No se pudo registrar el pago manual.' });
+    }
+});
+
+router.patch('/payments/:id', async (req, res) => {
+    const paymentStatus = req.body.paymentStatus || req.body.payment_status;
+    if (paymentStatus && !PAYMENT_STATUS.has(paymentStatus)) {
+        return res.status(400).json({ error: 'Estado de pago no valido.' });
+    }
+
+    try {
+        const result = await db.query(
+            `UPDATE payments
+             SET payment_status = COALESCE($1, payment_status),
+                 notes = COALESCE($2, notes),
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $3
+             RETURNING *`,
+            [paymentStatus || null, req.body.notes || null, req.params.id]
+        );
+
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Pago no encontrado.' });
+        await registrarActividad(req, 'payment_update', 'payments', 'Pago actualizado desde Admin Center.', req.body, result.rows[0].clinic_id);
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error actualizando pago:', err);
+        res.status(500).json({ error: 'No se pudo actualizar el pago.' });
+    }
+});
+
+router.get('/usage-metrics', async (req, res) => {
+    try {
+        const [summary, clinicUsage, activeClinics, inactiveClinics] = await Promise.all([
+            db.query(`
+                SELECT
+                    COUNT(DISTINCT v.id) FILTER (WHERE v.ultimo_login::date = CURRENT_DATE)::int AS clinicas_hoy,
+                    COUNT(DISTINCT v.id) FILTER (WHERE v.ultimo_login >= date_trunc('week', CURRENT_DATE))::int AS clinicas_semana,
+                    COUNT(DISTINCT v.id) FILTER (WHERE v.ultimo_login >= date_trunc('month', CURRENT_DATE))::int AS clinicas_mes,
+                    (SELECT COUNT(*)::int FROM mascotas WHERE fecha_registro::date = CURRENT_DATE) AS pacientes_hoy,
+                    (SELECT COUNT(*)::int FROM mascotas WHERE fecha_registro >= date_trunc('week', CURRENT_DATE)) AS pacientes_semana,
+                    (SELECT COUNT(*)::int FROM mascotas WHERE fecha_registro >= date_trunc('month', CURRENT_DATE)) AS pacientes_mes,
+                    (SELECT COUNT(*)::int FROM vacunas) AS vacunas_registradas,
+                    (SELECT COUNT(*)::int FROM desparasitaciones WHERE tipo = 'interna') AS desparasitaciones_internas,
+                    (SELECT COUNT(*)::int FROM desparasitaciones WHERE tipo = 'externa') AS desparasitaciones_externas,
+                    (SELECT COUNT(*)::int FROM controles) AS controles_preventivos,
+                    (SELECT COUNT(*)::int FROM support_tickets) AS tickets_enviados
+                FROM veterinarias v
+            `),
+            db.query(`
+                SELECT v.id, v.nombre AS clinica, v.plan_actual, v.ultimo_login,
+                       COUNT(DISTINCT m.id)::int AS pacientes,
+                       COUNT(DISTINCT vac.id)::int AS vacunas,
+                       COUNT(DISTINCT des.id)::int AS desparasitaciones,
+                       COUNT(DISTINCT c.id)::int AS controles,
+                       COUNT(DISTINCT st.id)::int AS tickets,
+                       COUNT(DISTINCT bv.id)::int AS banco_vacunas
+                FROM veterinarias v
+                LEFT JOIN mascotas m ON m.veterinaria_id = v.id
+                LEFT JOIN vacunas vac ON vac.mascota_id = m.id
+                LEFT JOIN desparasitaciones des ON des.mascota_id = m.id
+                LEFT JOIN controles c ON c.mascota_id = m.id
+                LEFT JOIN support_tickets st ON st.clinic_id = v.id
+                LEFT JOIN banco_vacunas bv ON bv.veterinaria_id = v.id
+                GROUP BY v.id
+                ORDER BY pacientes DESC, v.ultimo_login DESC NULLS LAST
+                LIMIT 300
+            `),
+            db.query(`
+                SELECT id, nombre AS clinica, ultimo_login, plan_actual
+                FROM veterinarias
+                ORDER BY ultimo_login DESC NULLS LAST
+                LIMIT 10
+            `),
+            db.query(`
+                SELECT id, nombre AS clinica, ultimo_login, plan_actual
+                FROM veterinarias
+                WHERE ultimo_login IS NULL OR ultimo_login < CURRENT_DATE - INTERVAL '15 days'
+                ORDER BY ultimo_login ASC NULLS FIRST
+                LIMIT 10
+            `)
+        ]);
+
+        res.json({
+            summary: summary.rows[0],
+            clinicUsage: clinicUsage.rows,
+            mostActiveClinics: activeClinics.rows,
+            inactiveClinics: inactiveClinics.rows
+        });
+    } catch (err) {
+        console.error('Error cargando metricas de uso:', err);
+        res.status(500).json({ error: 'No se pudieron cargar las metricas de uso.' });
+    }
+});
+
 router.get('/support-users', async (req, res) => {
     try {
         const result = await db.query(`
@@ -415,17 +693,102 @@ router.get('/activity', async (req, res) => {
 
 router.get('/alerts', async (req, res) => {
     try {
-        const [clinicas, feedback, vencimientos] = await Promise.all([
-            db.query(`SELECT COUNT(*)::int AS suspendidas FROM veterinarias WHERE estado_cuenta = 'suspendida'`),
-            db.query(`SELECT COUNT(*)::int AS urgentes FROM admin_feedback WHERE priority = 'urgente' AND status <> 'solucionado'`),
-            db.query(`SELECT COUNT(*)::int AS vencidos FROM veterinarias WHERE plan_vencimiento IS NOT NULL AND plan_vencimiento < CURRENT_DATE`)
+        const [persisted, suspendidas, vencidos, porVencer, ticketsUrgentes, ticketsSinRespuesta] = await Promise.all([
+            db.query(`
+                SELECT a.id, a.alert_type, a.title, a.description, a.severity, a.status,
+                       a.source_module, a.related_id, a.created_at, v.nombre AS clinica
+                FROM admin_alerts a
+                LEFT JOIN veterinarias v ON v.id = a.clinic_id
+                WHERE a.status IN ('pendiente', 'en_revision')
+                ORDER BY
+                    CASE a.severity WHEN 'critica' THEN 1 WHEN 'alta' THEN 2 WHEN 'media' THEN 3 ELSE 4 END,
+                    a.created_at DESC
+                LIMIT 100
+            `),
+            db.query(`SELECT id, nombre FROM veterinarias WHERE estado_cuenta = 'suspendida' ORDER BY nombre ASC LIMIT 20`),
+            db.query(`SELECT id, nombre, plan_vencimiento FROM veterinarias WHERE plan_vencimiento IS NOT NULL AND plan_vencimiento < CURRENT_DATE ORDER BY plan_vencimiento ASC LIMIT 20`),
+            db.query(`SELECT id, nombre, plan_vencimiento FROM veterinarias WHERE plan_vencimiento BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days' ORDER BY plan_vencimiento ASC LIMIT 20`),
+            db.query(`
+                SELECT t.id, t.subject, t.priority, t.status, t.created_at, v.nombre AS clinica
+                FROM support_tickets t
+                JOIN veterinarias v ON v.id = t.clinic_id
+                WHERE t.priority = 'urgente' AND t.status NOT IN ('solucionado', 'cerrado', 'rechazado')
+                ORDER BY t.created_at ASC
+                LIMIT 20
+            `),
+            db.query(`
+                SELECT t.id, t.subject, t.priority, t.status, t.created_at, v.nombre AS clinica
+                FROM support_tickets t
+                JOIN veterinarias v ON v.id = t.clinic_id
+                WHERE t.status IN ('enviado', 'recibido', 'revisado')
+                  AND t.created_at < CURRENT_TIMESTAMP - INTERVAL '24 hours'
+                ORDER BY t.created_at ASC
+                LIMIT 20
+            `)
         ]);
-        res.json(construirAlertas(
-            { suspendidas: clinicas.rows[0].suspendidas },
-            { hoy: 0 },
-            Array.from({ length: vencimientos.rows[0].vencidos }, () => ({ estado_plan: 'vencido' })),
-            { nuevos: feedback.rows[0].urgentes }
-        ));
+
+        const alerts = persisted.rows.map(row => ({
+            id: row.id,
+            level: row.severity === 'critica' ? 'danger' : row.severity === 'alta' ? 'warning' : 'info',
+            severity: row.severity,
+            status: row.status,
+            title: row.title,
+            detail: row.description || row.clinica || 'Alerta registrada',
+            source: row.source_module,
+            relatedId: row.related_id,
+            persistent: true
+        }));
+
+        suspendidas.rows.forEach(row => alerts.push({
+            level: 'warning',
+            severity: 'alta',
+            title: 'Clinica suspendida',
+            detail: row.nombre,
+            source: 'clinics',
+            relatedId: row.id
+        }));
+
+        vencidos.rows.forEach(row => alerts.push({
+            level: 'danger',
+            severity: 'critica',
+            title: 'Plan vencido',
+            detail: `${row.nombre} vencio el ${fechaSql(new Date(row.plan_vencimiento))}.`,
+            source: 'plans',
+            relatedId: row.id
+        }));
+
+        porVencer.rows.forEach(row => alerts.push({
+            level: 'warning',
+            severity: 'media',
+            title: 'Plan por caducar',
+            detail: `${row.nombre} vence el ${fechaSql(new Date(row.plan_vencimiento))}.`,
+            source: 'plans',
+            relatedId: row.id
+        }));
+
+        ticketsUrgentes.rows.forEach(row => alerts.push({
+            level: 'danger',
+            severity: 'critica',
+            title: 'Ticket urgente',
+            detail: `${row.clinica}: ${row.subject}`,
+            source: 'support',
+            relatedId: row.id
+        }));
+
+        ticketsSinRespuesta.rows.forEach(row => alerts.push({
+            level: 'warning',
+            severity: 'alta',
+            title: 'Ticket sin respuesta 24h',
+            detail: `${row.clinica}: ${row.subject}`,
+            source: 'support',
+            relatedId: row.id
+        }));
+
+        if (alerts.length === 0) {
+            alerts.push({ level: 'success', severity: 'baja', title: 'Sistema estable', detail: 'No hay alertas pendientes.' });
+        }
+
+        res.json(alerts);
     } catch (err) {
         console.error('Error cargando alertas:', err);
         res.status(500).json({ error: 'No se pudieron cargar las alertas.' });
