@@ -286,7 +286,7 @@ router.get('/patients', async (req, res) => {
 router.get('/tutors', async (req, res) => {
     try {
         const result = await db.query(`
-            SELECT MIN(m.id)::text AS id, m.veterinaria_id AS clinica_id, v.nombre AS clinica,
+            SELECT MIN(m.id::text) AS id, m.veterinaria_id AS clinica_id, v.nombre AS clinica,
                    COALESCE(MAX(NULLIF(TRIM(m.tutor_nombre), '')), 'Sin tutor') AS nombre,
                    COALESCE(MAX(NULLIF(TRIM(m.tutor_telefono), '')), '') AS telefono,
                    COALESCE(MAX(NULLIF(TRIM(m.tutor_email), '')), '') AS email,
