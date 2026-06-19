@@ -1372,6 +1372,7 @@ async function verCartillaMascota(id) {
     // Tutor
     document.getElementById('cartilla-tutor-nombre').textContent = mascota.tutor.nombre;
     document.getElementById('cartilla-tutor-telefono').textContent = mascota.tutor.telefono || 'N/A';
+    document.getElementById('cartilla-tutor-email').textContent = mascota.tutor.email || 'N/A';
     document.getElementById('cartilla-tutor-direccion').textContent = mascota.tutor.direccion || 'N/A';
     
     // Observaciones
@@ -2165,6 +2166,7 @@ async function verCartillaMascotaPublica(id) {
         // Tutor
         document.getElementById('cartilla-tutor-nombre').textContent = mascota.tutor.nombre;
         document.getElementById('cartilla-tutor-telefono').textContent = mascota.tutor.telefono || 'N/A';
+        document.getElementById('cartilla-tutor-email').textContent = mascota.tutor.email || 'N/A';
         document.getElementById('cartilla-tutor-direccion').textContent = mascota.tutor.direccion || 'N/A';
         
         // Observaciones

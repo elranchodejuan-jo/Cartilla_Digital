@@ -2413,6 +2413,7 @@ app.get('/api/public/mascotas/:id', async (req, res) => {
             foto: row.foto_base64 || '',
             tutor: {
                 nombre: row.tutor_nombre,
+                email: row.tutor_email || '',
                 telefono: '', // OCULTO POR PRIVACIDAD Y SEGURIDAD EN VISTA PÚBLICA
                 direccion: '' // OCULTO POR PRIVACIDAD Y SEGURIDAD EN VISTA PÚBLICA
             },
