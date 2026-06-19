@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centro de Control - Cartilla Digital</title>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-shell" id="admin-shell">
+        <aside class="admin-sidebar" id="admin-sidebar" aria-label="Menu del Centro de Control">
+            <div class="admin-brand">
+                <img src="assets/logo-placeholder.png" alt="Cartilla Digital" class="admin-brand-logo">
+                <div>
+                    <strong>Cartilla Digital</strong>
+                    <span>Admin Center</span>
+                </div>
+            </div>
+
+            <nav class="admin-nav" id="admin-nav">
+                <button class="admin-nav-btn active" data-view="dashboard">Dashboard</button>
+                <button class="admin-nav-btn" data-view="clinics">Clinicas</button>
+                <button class="admin-nav-btn" data-view="patients">Pacientes globales</button>
+                <button class="admin-nav-btn" data-view="tutors">Tutores</button>
+                <button class="admin-nav-btn" data-view="plans">Planes</button>
+                <button class="admin-nav-btn" data-view="payments">Pagos</button>
+                <button class="admin-nav-btn" data-view="trials">Pruebas gratis</button>
+                <button class="admin-nav-btn" data-view="feedback">Comentarios / Reportes</button>
+                <button class="admin-nav-btn" data-view="support">Soporte tecnico</button>
+                <button class="admin-nav-btn" data-view="activity">Actividad del sistema</button>
+                <button class="admin-nav-btn" data-view="alerts">Alertas</button>
+                <button class="admin-nav-btn" data-view="settings">Configuracion global</button>
+                <button class="admin-nav-btn" data-view="internal">Usuarios internos</button>
+                <button class="admin-nav-btn" data-view="security">Seguridad</button>
+            </nav>
+        </aside>
+
+        <div class="admin-backdrop" id="admin-backdrop" aria-hidden="true"></div>
+
+        <main class="admin-main">
+            <header class="admin-header">
+                <button class="admin-menu" id="admin-menu" type="button" aria-label="Abrir menu" aria-controls="admin-sidebar" aria-expanded="false">
+                    <span></span><span></span><span></span>
+                </button>
+                <div>
+                    <p class="admin-kicker">Centro de Control Cartilla Digital</p>
+                    <h1 id="admin-title">Dashboard</h1>
+                </div>
+                <div class="admin-header-actions">
+                    <button class="admin-theme" id="admin-theme" type="button" aria-label="Cambiar tema">Modo oscuro</button>
+                    <a class="admin-link" href="/?clinic_app=1">Volver a app clinica</a>
+                    <button class="admin-logout" id="admin-logout" type="button">Salir</button>
+                </div>
+            </header>
+
+            <section class="admin-userbar" id="admin-userbar" hidden>
+                <span id="admin-user-name">Super admin</span>
+                <span id="admin-user-email"></span>
+                <span class="admin-badge success">super_admin</span>
+            </section>
+
+            <section class="admin-status" id="admin-status" role="status">Cargando Centro de Control...</section>
+
+            <section id="view-dashboard" class="admin-view active"></section>
+            <section id="view-clinics" class="admin-view"></section>
+            <section id="view-patients" class="admin-view"></section>
+            <section id="view-tutors" class="admin-view"></section>
+            <section id="view-plans" class="admin-view"></section>
+            <section id="view-payments" class="admin-view"></section>
+            <section id="view-trials" class="admin-view"></section>
+            <section id="view-feedback" class="admin-view"></section>
+            <section id="view-support" class="admin-view"></section>
+            <section id="view-activity" class="admin-view"></section>
+            <section id="view-alerts" class="admin-view"></section>
+            <section id="view-settings" class="admin-view"></section>
+            <section id="view-internal" class="admin-view"></section>
+            <section id="view-security" class="admin-view"></section>
+        </main>
+    </div>
+
+    <div class="admin-toast-wrap" id="admin-toast-wrap" aria-live="polite"></div>
+
+    <script src="js/api.js"></script>
+    <script src="js/admin-service.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>

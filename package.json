@@ -4,7 +4,7 @@
     "dev": "node static-server.js",
     "frontend": "node static-server.js",
     "backend": "npm --prefix server start",
-    "check": "node --check static-server.js && node --check js/api.js && node --check js/storage.js && node --check js/codigo.js && node --check js/razas.js && node --check js/fotos.js && node --check js/mascotas.js && node --check js/vacunas.js && node --check js/desparasitaciones.js && node --check js/controles.js && node --check js/banco.js && node --check js/equipo.js && node --check js/transferencias.js && node --check js/ui.js && node --check js/app.js && node --check server/index.js && node --check server/db.js && node --check server/authMiddleware.js && node --check server/migrate.js && node scratch/check_html.js && node scratch/test_storage.js && node scratch/test_flow.js"
+    "check": "node --check static-server.js && node --check js/api.js && node --check js/storage.js && node --check js/codigo.js && node --check js/razas.js && node --check js/fotos.js && node --check js/mascotas.js && node --check js/vacunas.js && node --check js/desparasitaciones.js && node --check js/controles.js && node --check js/banco.js && node --check js/equipo.js && node --check js/transferencias.js && node --check js/ui.js && node --check js/app.js && node --check js/admin-service.js && node --check js/admin.js && node --check server/index.js && node --check server/db.js && node --check server/authMiddleware.js && node --check server/adminRoutes.js && node --check server/migrate.js && node scratch/check_html.js && node scratch/test_storage.js && node scratch/test_flow.js"
   },
   "dependencies": {
     "jsdom": "^29.1.1"

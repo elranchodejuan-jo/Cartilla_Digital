@@ -128,7 +128,10 @@ async function proxyApiRequest(req, res, url) {
 
 const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://localhost:${PORT}`);
-    const rutaSolicitada = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
+    let rutaSolicitada = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
+    if (rutaSolicitada === '/admin' || rutaSolicitada === '/admin/') {
+        rutaSolicitada = '/admin.html';
+    }
 
     if (rutaSolicitada === '/api' || rutaSolicitada.startsWith('/api/')) {
         proxyApiRequest(req, res, url).catch(err => {

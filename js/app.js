@@ -16,6 +16,16 @@ function esEmailValidoOpcional(valor) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
 }
 
+function esSesionSuperAdmin() {
+    const vet = API.getSessionVet ? API.getSessionVet() : null;
+    return vet && vet.role === 'super_admin';
+}
+
+function debeAbrirAppClinica() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('clinic_app') === '1';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Inicializar eventos principales del DOM y filtros
     inicializarUI();
@@ -111,6 +121,8 @@ async function verificarEnrutamiento() {
     
     if (!loggedIn) {
         navegarA('login');
+    } else if (esSesionSuperAdmin() && !debeAbrirAppClinica()) {
+        window.location.href = '/admin';
     } else {
         await cargarEquipoVeterinario();
         navegarA('inicio');

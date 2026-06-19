@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
 const authMiddleware = require('./authMiddleware');
+const adminRoutes = require('./adminRoutes');
 require('dotenv').config();
 
 const crypto = require('crypto');
@@ -186,9 +187,12 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(401).json({ error: 'Credenciales inválidas.' });
         }
         
+        await db.query('UPDATE veterinarias SET ultimo_login = CURRENT_TIMESTAMP WHERE id = $1', [vet.id]);
+        const role = vet.role || 'clinic_owner';
+        
         // Generar JWT
         const token = jwt.sign(
-            { id: vet.id, email: vet.email, nombre: vet.nombre, iniciales: vet.iniciales },
+            { id: vet.id, email: vet.email, nombre: vet.nombre, iniciales: vet.iniciales, role },
             process.env.JWT_SECRET,
             { expiresIn: '30d' } // Token válido por 30 días
         );
@@ -203,7 +207,10 @@ app.post('/api/auth/login', async (req, res) => {
                 iniciales: vet.iniciales,
                 telefono: vet.telefono,
                 direccion: vet.direccion,
-                logo: vet.logo_base64
+                logo: vet.logo_base64,
+                role,
+                estadoCuenta: vet.estado_cuenta || 'activa',
+                planActual: vet.plan_actual || 'Free'
             }
         });
     } catch (err) {
@@ -331,6 +338,8 @@ app.post('/api/auth/reset-password', async (req, res) => {
         res.status(500).json({ error: 'Error al restablecer la contraseña.' });
     }
 });
+
+app.use('/api/admin', adminRoutes);
 
 // --- PERFIL DE VETERINARIA ---
 
@@ -2842,3 +2851,4 @@ serverInstance.on('error', (err) => {
 });
 
 setInterval(() => {}, 60 * 60 * 1000);
+
