@@ -26,6 +26,10 @@ function debeAbrirAppClinica() {
     return params.get('clinic_app') === '1';
 }
 
+function abrirAdminCenter() {
+    window.location.href = 'admin.html';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Inicializar eventos principales del DOM y filtros
     inicializarUI();
@@ -122,7 +126,7 @@ async function verificarEnrutamiento() {
     if (!loggedIn) {
         navegarA('login');
     } else if (esSesionSuperAdmin() && !debeAbrirAppClinica()) {
-        window.location.href = '/admin';
+        abrirAdminCenter();
     } else {
         await cargarEquipoVeterinario();
         navegarA('inicio');

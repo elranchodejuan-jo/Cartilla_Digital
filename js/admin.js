@@ -31,7 +31,7 @@
         bindShellEvents();
 
         if (!API.isLoggedIn()) {
-            showBlocked('Debes iniciar sesion para acceder al Centro de Control.', 'Ir al login', '/');
+            showBlocked('Debes iniciar sesion para acceder al Centro de Control.', 'Ir al login', 'index.html');
             return;
         }
 
@@ -43,9 +43,9 @@
             await navigate('dashboard');
         } catch (err) {
             if (err.status === 403) {
-                showBlocked('No tienes permiso para acceder al Centro de Control.', 'Volver a Cartilla Digital', '/?clinic_app=1');
+                showBlocked('No tienes permiso para acceder al Centro de Control.', 'Volver a Cartilla Digital', 'index.html?clinic_app=1');
             } else {
-                showBlocked(err.message || 'No se pudo abrir el Centro de Control.', 'Reintentar', '/admin');
+                showBlocked(err.message || 'No se pudo abrir el Centro de Control.', 'Reintentar', 'admin.html');
             }
         }
     }
@@ -72,7 +72,7 @@
         if (logout) {
             logout.addEventListener('click', () => {
                 API.logout();
-                window.location.href = '/';
+                window.location.href = 'index.html';
             });
         }
 
