@@ -1660,196 +1660,6 @@ body.public-view #theme-toggle {
     display: none !important;
 }
 
-/* --- CSS DE IMPRESIÓN (A4 CLÍNICA) --- */
-@media print {
-    body {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        padding-top: 0 !important;
-        font-size: 9pt !important;
-    }
-    
-    /* Ocultar secciones inactivas y elementos no imprimibles */
-    .header,
-    .nav,
-    .dashboard-title-bar,
-    .dashboard-grid,
-    .actions-panel,
-    .patient-card-actions,
-    .form-actions,
-    .modal-overlay,
-    .modal,
-    .toast-container,
-    .btn,
-    .no-print,
-    .app-section {
-        display: none !important;
-    }
-    
-    .container {
-        max-width: 100% !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-    
-    #section-cartilla {
-        display: block !important;
-        opacity: 1 !important;
-        transform: none !important;
-    }
-    
-    /* Forzar siempre las dos columnas sin importar el dispositivo que imprima */
-    .cartilla-main-grid {
-        display: grid !important;
-        grid-template-columns: 210px 1fr !important;
-        gap: 15px !important;
-        align-items: start !important;
-    }
-    
-    .cartilla-side-col {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 10px !important;
-    }
-    
-    .clinic-card-header {
-        border: none !important;
-        border-bottom: 1px solid #000000 !important;
-        box-shadow: none !important;
-        padding: 0 0 8px 0 !important;
-        margin-bottom: 16px !important;
-        background: transparent !important;
-        display: flex !important;
-        justify-content: space-between !important;
-    }
-    
-    .clinic-logo-view {
-        width: 45px !important;
-        height: 45px !important;
-        border: none !important;
-    }
-    
-    .clinic-text-brand h2 {
-        font-size: 14pt !important;
-        margin-bottom: 2px !important;
-    }
-    
-    .cartilla-code-badge {
-        background: transparent !important;
-        border: 1px solid #000000 !important;
-        padding: 4px 8px !important;
-        border-radius: 4px !important;
-    }
-    
-    .cartilla-code-num {
-        font-size: 11pt !important;
-    }
-    
-    /* Minimalismo: Solo bordes redondeados y delgados */
-    .cartilla-profile-card,
-    .tutor-card,
-    .qr-card,
-    .signature-card,
-    .clinical-section {
-        border: 1px solid #DDDDDD !important;
-        box-shadow: none !important;
-        background-color: transparent !important;
-        padding: 10px !important;
-        margin-bottom: 0 !important;
-        border-radius: 8px !important;
-        page-break-inside: avoid !important;
-        filter: none !important;
-    }
-    
-    .clinical-section {
-        margin-bottom: 15px !important;
-    }
-    
-    .cartilla-photo {
-        width: 110px !important;
-        height: 110px !important;
-        border: 1px solid #EEEEEE !important;
-        box-shadow: none !important;
-    }
-    
-    .cartilla-pet-name {
-        font-size: 13pt !important;
-        margin: 6px 0 !important;
-    }
-    
-    .cartilla-details-list {
-        margin-top: 6px !important;
-        padding-top: 6px !important;
-        gap: 4px !important;
-    }
-    
-    .cartilla-detail-item {
-        font-size: 8.5pt !important;
-    }
-    
-    /* Minimalismo en Tablas */
-    .clinic-table {
-        border-collapse: collapse !important;
-    }
-    
-    .clinic-table th {
-        background-color: transparent !important;
-        border: none !important;
-        border-bottom: 1px solid #000000 !important;
-        padding: 6px 8px !important;
-        color: #000000 !important;
-        font-weight: 700 !important;
-    }
-    
-    .clinic-table td {
-        border: none !important;
-        border-bottom: 1px solid #EEEEEE !important;
-        padding: 6px 8px !important;
-    }
-    
-    .status-badge {
-        border: 1px solid #666666 !important;
-        background: transparent !important;
-        color: #333333 !important;
-        padding: 2px 4px !important;
-        font-size: 7.5pt !important;
-        border-radius: 4px !important;
-    }
-    
-    /* Mostrar elementos de impresión */
-    .print-only {
-        display: block !important;
-    }
-    
-    /* Redimensionar el código QR en impresión */
-    #qrcode canvas,
-    #qrcode img {
-        width: 120px !important;
-        height: 120px !important;
-        margin: 0 auto !important;
-    }
-    
-    /* Tarjeta de Firma y Sello en panel lateral ajustada */
-    .signature-card {
-        text-align: center;
-        margin-top: 0 !important;
-        padding-top: 5px !important;
-        padding-bottom: 5px !important;
-    }
-    
-    .signature-line {
-        border-top: 1px solid #000000;
-        width: 85%;
-        margin: 35px auto 5px auto;
-    }
-    
-    .signature-text {
-        font-size: 8pt;
-        font-weight: 600;
-        color: #000000;
-    }
-}
-
 @page {
     size: A4 portrait;
     margin: 10mm;
@@ -4324,16 +4134,7 @@ textarea,
     }
 }
 
-@media print {
-    #qr-code canvas,
-    #qr-code img,
-    #print-qr-code canvas,
-    #print-qr-code img {
-        width: 132px !important;
-        height: 132px !important;
-        border-radius: 0 !important;
-    }
-}
+
 
 /* Fase 2: cartilla clinica, QR e impresion profesional */
 .clinic-card-header,
@@ -4499,325 +4300,6 @@ body.public-view .tutor-action {
     .import-actions .btn,
     .import-panel-header .btn {
         width: 100%;
-    }
-}
-
-@media print {
-    body {
-        background: #ffffff !important;
-    }
-
-    .clinical-sidebar,
-    .app-header,
-    .site-footer,
-    .sidebar-backdrop,
-    .sidebar-toggle,
-    .no-print,
-    .modal,
-    .modal-overlay,
-    .toast-container,
-    .actions-panel,
-    .dashboard-title-bar,
-    .import-panel {
-        display: none !important;
-    }
-
-    .container {
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow: visible !important;
-    }
-
-    #section-cartilla {
-        display: block !important;
-        padding: 0 !important;
-        color: #111827 !important;
-    }
-
-    .clinic-card-header,
-    .cartilla-main-grid,
-    .cartilla-profile-card,
-    .tutor-card,
-    .qr-card,
-    .clinical-section,
-    .timeline-item {
-        box-shadow: none !important;
-        background: #ffffff !important;
-        border-color: #cbd5e1 !important;
-    }
-
-    .cartilla-main-grid {
-        display: grid !important;
-        grid-template-columns: 30% 1fr !important;
-        gap: 12px !important;
-        align-items: start !important;
-    }
-
-    .clinic-card-header,
-    .cartilla-profile-card,
-    .tutor-card,
-    .qr-card,
-    .clinical-section,
-    .timeline-item,
-    .clinic-table tr {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-    }
-
-    .clinic-card-header {
-        margin-bottom: 12px !important;
-        padding: 10px 12px !important;
-    }
-
-    .clinic-logo-view {
-        width: 56px !important;
-        height: 56px !important;
-    }
-
-    .cartilla-photo {
-        width: 105px !important;
-        height: 105px !important;
-    }
-
-    #qrcode,
-    .qr-box {
-        width: 150px !important;
-        min-width: 150px !important;
-        min-height: 150px !important;
-        padding: 6px !important;
-        border: 1px solid #111827 !important;
-    }
-
-    #qrcode canvas,
-    #qrcode img,
-    .qr-box canvas,
-    .qr-box img {
-        width: 138px !important;
-        height: 138px !important;
-    }
-
-    .clinic-table {
-        width: 100% !important;
-        border-collapse: collapse !important;
-        font-size: 8.5pt !important;
-    }
-
-    .clinic-table th,
-    .clinic-table td {
-        padding: 5px 6px !important;
-        border: 1px solid #d1d5db !important;
-    }
-
-    .section-title {
-        font-size: 11pt !important;
-    }
-}
-
-/* Correccion puntual: impresion/PDF de cartilla en A4 sin QR/firma aislados */
-@media print {
-    html,
-    body {
-        width: auto !important;
-        height: auto !important;
-        min-height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow: visible !important;
-        background: #ffffff !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
-
-    .clinical-sidebar,
-    .app-header,
-    .site-footer,
-    .sidebar-backdrop,
-    .sidebar-toggle,
-    .theme-switch,
-    .btn-theme-toggle,
-    .no-print,
-    .modal,
-    .modal-overlay,
-    .toast-container,
-    .actions-panel,
-    .dashboard-title-bar,
-    .import-panel {
-        display: none !important;
-    }
-
-    .container,
-    #section-cartilla {
-        display: block !important;
-        width: 100% !important;
-        max-width: none !important;
-        height: auto !important;
-        min-height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow: visible !important;
-        transform: none !important;
-    }
-
-    .clinic-card-header {
-        padding: 0 0 8px 0 !important;
-        margin: 0 0 10px 0 !important;
-        border: 0 !important;
-        border-bottom: 1px solid #111827 !important;
-        box-shadow: none !important;
-        background: #ffffff !important;
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-    }
-
-    .clinic-logo-view {
-        width: 45px !important;
-        height: 45px !important;
-    }
-
-    .cartilla-main-grid {
-        display: grid !important;
-        grid-template-columns: 210px 1fr !important;
-        gap: 12px !important;
-        align-items: start !important;
-        break-inside: auto !important;
-        page-break-inside: auto !important;
-    }
-
-    .cartilla-side-col {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 8px !important;
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-    }
-
-    .cartilla-content-col {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 8px !important;
-        break-inside: auto !important;
-        page-break-inside: auto !important;
-    }
-
-    .cartilla-profile-card,
-    .tutor-card,
-    .qr-card,
-    .signature-card {
-        padding: 8px !important;
-        margin: 0 !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 6px !important;
-        box-shadow: none !important;
-        background: #ffffff !important;
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-        break-before: auto !important;
-        page-break-before: auto !important;
-        break-after: auto !important;
-        page-break-after: auto !important;
-    }
-
-    .clinical-section {
-        padding: 8px !important;
-        margin: 0 0 8px 0 !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 6px !important;
-        box-shadow: none !important;
-        background: #ffffff !important;
-        break-inside: auto !important;
-        page-break-inside: auto !important;
-    }
-
-    .cartilla-photo {
-        width: 96px !important;
-        height: 96px !important;
-        margin-bottom: 8px !important;
-        border-width: 1px !important;
-        box-shadow: none !important;
-    }
-
-    .cartilla-pet-name {
-        font-size: 12pt !important;
-        margin: 4px 0 !important;
-    }
-
-    .cartilla-details-list,
-    .tutor-card-title {
-        margin-top: 6px !important;
-        padding-top: 6px !important;
-        gap: 3px !important;
-    }
-
-    .cartilla-detail-item,
-    .tutor-item {
-        font-size: 8pt !important;
-        margin-bottom: 4px !important;
-    }
-
-    .qr-card {
-        text-align: center !important;
-    }
-
-    #qrcode,
-    .qr-box {
-        width: 128px !important;
-        min-width: 128px !important;
-        min-height: 128px !important;
-        height: 128px !important;
-        padding: 4px !important;
-        margin: 0 auto !important;
-        border: 1px solid #111827 !important;
-        border-radius: 0 !important;
-        background: #ffffff !important;
-        break-before: auto !important;
-        page-break-before: auto !important;
-    }
-
-    #qrcode canvas,
-    #qrcode img,
-    .qr-box canvas,
-    .qr-box img {
-        width: 118px !important;
-        height: 118px !important;
-        max-width: 118px !important;
-        max-height: 118px !important;
-        border-radius: 0 !important;
-        margin: 0 auto !important;
-    }
-
-    .signature-card {
-        padding-top: 6px !important;
-        padding-bottom: 6px !important;
-    }
-
-    .signature-line {
-        width: 84% !important;
-        margin: 20px auto 4px auto !important;
-        border-top: 1px solid #111827 !important;
-    }
-
-    .signature-text {
-        font-size: 7.5pt !important;
-    }
-
-    .clinic-table {
-        width: 100% !important;
-        border-collapse: collapse !important;
-        font-size: 8pt !important;
-    }
-
-    .clinic-table th,
-    .clinic-table td {
-        padding: 4px 5px !important;
-        border: 1px solid #d1d5db !important;
-        vertical-align: top !important;
-    }
-
-    .clinic-table tr,
-    .timeline-item {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
     }
 }
 
@@ -5341,30 +4823,7 @@ body.public-view #section-cartilla .clinic-table th {
     color: #1f2937 !important;
 }
 
-@media print {
-    #section-cartilla,
-    #section-cartilla * {
-        background-color: #ffffff !important;
-        color: #111827 !important;
-        box-shadow: none !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
 
-    #section-cartilla .clinic-card-header,
-    #section-cartilla .cartilla-profile-card,
-    #section-cartilla .tutor-card,
-    #section-cartilla .qr-card,
-    #section-cartilla .clinical-section,
-    #section-cartilla .clinic-table tr,
-    #section-cartilla .clinic-table th,
-    #section-cartilla .clinic-table td,
-    #section-cartilla .timeline-item {
-        background: #ffffff !important;
-        color: #111827 !important;
-        border-color: #cfd8e3 !important;
-    }
-}
 
 /* Correccion urgente: vista tutor solo lectura, PDF limpio y ancho profesional */
 @media screen {
@@ -5476,7 +4935,39 @@ body.public-view #section-cartilla .clinic-table th {
     }
 }
 
+
+
+/* Contrato estable de impresion/PDF de cartilla.
+   Mantener esta capa al final para evitar regresiones por reglas print antiguas. */
 @media print {
+    html,
+    body {
+        width: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        color: #111827 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .clinical-sidebar,
+    .app-header,
+    .site-footer,
+    .sidebar-backdrop,
+    .sidebar-toggle,
+    .theme-switch,
+    .btn-theme-toggle,
+    .dashboard-title-bar,
+    .dashboard-grid,
+    .actions-panel,
+    .import-panel,
+    .modal,
+    .modal-overlay,
+    .toast-container,
     .cartilla-actions,
     .cartilla-action-buttons,
     .share-actions,
@@ -5497,43 +4988,171 @@ body.public-view #section-cartilla .clinic-table th {
         display: none !important;
     }
 
-    body {
-        background: #ffffff !important;
+    .app-section {
+        display: none !important;
     }
 
+    .container,
     .cartilla-container,
     .public-cartilla,
     .cartilla-print,
-    .container,
     #section-cartilla {
+        display: block !important;
         width: 100% !important;
         max-width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
+        overflow: visible !important;
+        transform: none !important;
+        background: #ffffff !important;
+        color: #111827 !important;
+    }
+
+    #section-cartilla {
+        opacity: 1 !important;
+    }
+
+    #section-cartilla * {
+        box-shadow: none !important;
+        text-shadow: none !important;
+        color: #111827 !important;
+    }
+
+    .clinic-card-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        gap: 6mm !important;
+        padding: 0 0 4mm 0 !important;
+        margin: 0 0 5mm 0 !important;
+        border: 0 !important;
+        border-bottom: 1px solid #111827 !important;
+        border-radius: 0 !important;
+        background: #ffffff !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .clinic-logo-view {
+        width: 16mm !important;
+        height: 16mm !important;
+        max-width: 16mm !important;
+        max-height: 16mm !important;
+        object-fit: contain !important;
+        border: 1px solid #d1d5db !important;
         background: #ffffff !important;
     }
-}
 
-/* Ajuste final solo impresion/PDF: sidebar y QR mas legibles */
-@media print {
+    .clinic-text-brand h2 {
+        font-size: 14pt !important;
+        line-height: 1.15 !important;
+        margin: 0 0 2mm 0 !important;
+    }
+
+    .clinic-text-brand p,
+    .clinic-text-brand span,
+    .cartilla-code-label,
+    .cartilla-code-num {
+        white-space: normal !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+    }
+
+    .cartilla-code-badge {
+        background: #ffffff !important;
+        border: 1px solid #111827 !important;
+        border-radius: 4px !important;
+        padding: 2mm 3mm !important;
+    }
+
     .cartilla-main-grid {
         display: grid !important;
         grid-template-columns: 27% minmax(0, 73%) !important;
         gap: 6mm !important;
         align-items: start !important;
-    }
-
-    .cartilla-side-col {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-    }
-
-    .cartilla-content-col {
         width: 100% !important;
         max-width: 100% !important;
         min-width: 0 !important;
         overflow: visible !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+    }
+
+    .cartilla-side-col {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 3mm !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .cartilla-content-col {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 3mm !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+    }
+
+    .clinic-card-header,
+    .cartilla-profile-card,
+    .tutor-card,
+    .qr-card,
+    .signature-card,
+    .clinical-section,
+    .timeline-item,
+    .record-card,
+    .vaccine-card,
+    .deworming-card,
+    .preventive-card {
+        background: #ffffff !important;
+        border-color: #cfd8e3 !important;
+        box-shadow: none !important;
+        filter: none !important;
+    }
+
+    .cartilla-profile-card,
+    .tutor-card,
+    .qr-card,
+    .signature-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 3mm !important;
+        border: 1px solid #cfd8e3 !important;
+        border-radius: 6px !important;
+        overflow: visible !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        break-before: auto !important;
+        page-break-before: auto !important;
+        break-after: auto !important;
+        page-break-after: auto !important;
+    }
+
+    .clinical-section {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 0 3mm 0 !important;
+        padding: 3mm !important;
+        border: 1px solid #cfd8e3 !important;
+        border-radius: 6px !important;
+        overflow: visible !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
     }
 
     .cartilla-photo {
@@ -5542,6 +5161,36 @@ body.public-view #section-cartilla .clinic-table th {
         max-width: 32mm !important;
         max-height: 32mm !important;
         object-fit: cover !important;
+        margin-bottom: 2mm !important;
+        border: 1px solid #d1d5db !important;
+    }
+
+    .cartilla-pet-name {
+        font-size: 12pt !important;
+        line-height: 1.15 !important;
+        margin: 2mm 0 !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+    }
+
+    .cartilla-details-list,
+    .tutor-card-title {
+        margin-top: 2mm !important;
+        padding-top: 2mm !important;
+        gap: 1.5mm !important;
+    }
+
+    .cartilla-detail-item,
+    .tutor-item {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-bottom: 1.5mm !important;
+        font-size: 8pt !important;
+        line-height: 1.25 !important;
+        white-space: normal !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
     }
 
     .qr-card,
@@ -5551,6 +5200,8 @@ body.public-view #section-cartilla .clinic-table th {
         max-width: none !important;
         padding: 4mm !important;
         text-align: center !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
     }
 
     #qrcode,
@@ -5563,6 +5214,13 @@ body.public-view #section-cartilla .clinic-table th {
         max-width: 100% !important;
         margin: 0 auto !important;
         overflow: visible !important;
+        border: 1px solid #111827 !important;
+        border-radius: 0 !important;
+        background: #ffffff !important;
+        display: grid !important;
+        place-items: center !important;
+        break-before: auto !important;
+        page-break-before: auto !important;
     }
 
     #qrcode canvas,
@@ -5578,6 +5236,9 @@ body.public-view #section-cartilla .clinic-table th {
         max-width: 32mm !important;
         max-height: 32mm !important;
         image-rendering: pixelated;
+        border-radius: 0 !important;
+        object-fit: contain !important;
+        margin: 0 auto !important;
     }
 
     .cartilla-section,
@@ -5610,6 +5271,13 @@ body.public-view #section-cartilla .clinic-table th {
         min-width: 0 !important;
         table-layout: fixed !important;
         border-collapse: collapse !important;
+        font-size: 8px !important;
+    }
+
+    .clinic-table tr,
+    .timeline-item {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
     }
 
     .clinic-table th,
@@ -5622,6 +5290,28 @@ body.public-view #section-cartilla .clinic-table th {
         font-size: 8px !important;
         line-height: 1.25 !important;
         padding: 3px 4px !important;
+        border: 1px solid #d1d5db !important;
+        vertical-align: top !important;
+    }
+
+    .clinic-table th {
+        background: #f8fafc !important;
+        font-weight: 700 !important;
+    }
+
+    .section-title {
+        font-size: 11pt !important;
+        line-height: 1.2 !important;
+        margin-bottom: 2mm !important;
+    }
+
+    .status-badge {
+        border: 1px solid #6b7280 !important;
+        background: #ffffff !important;
+        color: #111827 !important;
+        padding: 1px 3px !important;
+        font-size: 7.5pt !important;
+        border-radius: 4px !important;
     }
 
     .record-card,
@@ -5648,5 +5338,22 @@ body.public-view #section-cartilla .clinic-table th {
     .signature-section {
         width: 100% !important;
         margin-top: 4mm !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .signature-line {
+        width: 84% !important;
+        margin: 12mm auto 2mm auto !important;
+        border-top: 1px solid #111827 !important;
+    }
+
+    .signature-text {
+        font-size: 7.5pt !important;
+        line-height: 1.2 !important;
+    }
+
+    .print-only {
+        display: block !important;
     }
 }

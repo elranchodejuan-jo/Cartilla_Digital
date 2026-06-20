@@ -2724,8 +2724,8 @@ app.get('/api/public/mascotas/:id', async (req, res) => {
             tutor: {
                 nombre: row.tutor_nombre,
                 email: row.tutor_email || '',
-                telefono: '', // OCULTO POR PRIVACIDAD Y SEGURIDAD EN VISTA PÚBLICA
-                direccion: '' // OCULTO POR PRIVACIDAD Y SEGURIDAD EN VISTA PÚBLICA
+                telefono: row.tutor_telefono || '',
+                direccion: row.tutor_direccion || ''
             },
             observaciones: row.observaciones || '',
             vacunas,
