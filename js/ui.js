@@ -475,8 +475,18 @@ function configurarModoPublico(activar) {
     UIState.modoPublico = activar;
     if (activar) {
         document.body.classList.add('public-view');
+        document.body.classList.add('tutor-view');
+        if (document.body.classList.contains('dark-theme')) {
+            document.body.dataset.tutorPreviousTheme = 'dark';
+            document.body.classList.remove('dark-theme');
+        }
     } else {
         document.body.classList.remove('public-view');
+        document.body.classList.remove('tutor-view');
+        if (document.body.dataset.tutorPreviousTheme === 'dark') {
+            document.body.classList.add('dark-theme');
+        }
+        delete document.body.dataset.tutorPreviousTheme;
     }
 }
 

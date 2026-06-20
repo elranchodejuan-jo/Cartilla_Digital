@@ -1850,6 +1850,11 @@ body.public-view #theme-toggle {
     }
 }
 
+@page {
+    size: A4 portrait;
+    margin: 10mm;
+}
+
 /* --- Estilos Banco Clínico --- */
 .banco-tab-pane {
     display: none;
@@ -4606,5 +4611,445 @@ body.public-view .tutor-action {
 
     .section-title {
         font-size: 11pt !important;
+    }
+}
+
+/* Correccion puntual: impresion/PDF de cartilla en A4 sin QR/firma aislados */
+@media print {
+    html,
+    body {
+        width: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .clinical-sidebar,
+    .app-header,
+    .site-footer,
+    .sidebar-backdrop,
+    .sidebar-toggle,
+    .theme-switch,
+    .btn-theme-toggle,
+    .no-print,
+    .modal,
+    .modal-overlay,
+    .toast-container,
+    .actions-panel,
+    .dashboard-title-bar,
+    .import-panel {
+        display: none !important;
+    }
+
+    .container,
+    #section-cartilla {
+        display: block !important;
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        transform: none !important;
+    }
+
+    .clinic-card-header {
+        padding: 0 0 8px 0 !important;
+        margin: 0 0 10px 0 !important;
+        border: 0 !important;
+        border-bottom: 1px solid #111827 !important;
+        box-shadow: none !important;
+        background: #ffffff !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .clinic-logo-view {
+        width: 45px !important;
+        height: 45px !important;
+    }
+
+    .cartilla-main-grid {
+        display: grid !important;
+        grid-template-columns: 210px 1fr !important;
+        gap: 12px !important;
+        align-items: start !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+    }
+
+    .cartilla-side-col {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .cartilla-content-col {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+    }
+
+    .cartilla-profile-card,
+    .tutor-card,
+    .qr-card,
+    .signature-card {
+        padding: 8px !important;
+        margin: 0 !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 6px !important;
+        box-shadow: none !important;
+        background: #ffffff !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        break-before: auto !important;
+        page-break-before: auto !important;
+        break-after: auto !important;
+        page-break-after: auto !important;
+    }
+
+    .clinical-section {
+        padding: 8px !important;
+        margin: 0 0 8px 0 !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 6px !important;
+        box-shadow: none !important;
+        background: #ffffff !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+    }
+
+    .cartilla-photo {
+        width: 96px !important;
+        height: 96px !important;
+        margin-bottom: 8px !important;
+        border-width: 1px !important;
+        box-shadow: none !important;
+    }
+
+    .cartilla-pet-name {
+        font-size: 12pt !important;
+        margin: 4px 0 !important;
+    }
+
+    .cartilla-details-list,
+    .tutor-card-title {
+        margin-top: 6px !important;
+        padding-top: 6px !important;
+        gap: 3px !important;
+    }
+
+    .cartilla-detail-item,
+    .tutor-item {
+        font-size: 8pt !important;
+        margin-bottom: 4px !important;
+    }
+
+    .qr-card {
+        text-align: center !important;
+    }
+
+    #qrcode,
+    .qr-box {
+        width: 128px !important;
+        min-width: 128px !important;
+        min-height: 128px !important;
+        height: 128px !important;
+        padding: 4px !important;
+        margin: 0 auto !important;
+        border: 1px solid #111827 !important;
+        border-radius: 0 !important;
+        background: #ffffff !important;
+        break-before: auto !important;
+        page-break-before: auto !important;
+    }
+
+    #qrcode canvas,
+    #qrcode img,
+    .qr-box canvas,
+    .qr-box img {
+        width: 118px !important;
+        height: 118px !important;
+        max-width: 118px !important;
+        max-height: 118px !important;
+        border-radius: 0 !important;
+        margin: 0 auto !important;
+    }
+
+    .signature-card {
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+    }
+
+    .signature-line {
+        width: 84% !important;
+        margin: 20px auto 4px auto !important;
+        border-top: 1px solid #111827 !important;
+    }
+
+    .signature-text {
+        font-size: 7.5pt !important;
+    }
+
+    .clinic-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 8pt !important;
+    }
+
+    .clinic-table th,
+    .clinic-table td {
+        padding: 4px 5px !important;
+        border: 1px solid #d1d5db !important;
+        vertical-align: top !important;
+    }
+
+    .clinic-table tr,
+    .timeline-item {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+}
+
+/* Correccion puntual: vista publica/tutor responsive sin overflow horizontal */
+@media screen {
+    body.tutor-view,
+    body.public-view {
+        overflow-x: hidden !important;
+        background: #f4f8fb !important;
+        color: #1f2937 !important;
+    }
+
+    body.tutor-view *,
+    body.public-view * {
+        box-sizing: border-box;
+    }
+
+    body.tutor-view .clinical-sidebar,
+    body.tutor-view .app-header,
+    body.tutor-view .sidebar-backdrop,
+    body.tutor-view .sidebar-toggle,
+    body.tutor-view .site-footer,
+    body.public-view .clinical-sidebar,
+    body.public-view .app-header,
+    body.public-view .sidebar-backdrop,
+    body.public-view .sidebar-toggle,
+    body.public-view .site-footer {
+        display: none !important;
+    }
+
+    body.tutor-view .container,
+    body.public-view .container {
+        width: 100% !important;
+        max-width: 900px !important;
+        min-width: 0 !important;
+        margin: 0 auto !important;
+        padding: 12px !important;
+        overflow-x: hidden !important;
+    }
+
+    body.tutor-view #section-cartilla,
+    body.public-view #section-cartilla {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        overflow-x: hidden !important;
+        background: transparent !important;
+    }
+
+    body.tutor-view .clinic-card-header,
+    body.tutor-view .cartilla-main-grid,
+    body.tutor-view .cartilla-side-col,
+    body.tutor-view .cartilla-content-col,
+    body.tutor-view .cartilla-profile-card,
+    body.tutor-view .tutor-card,
+    body.tutor-view .qr-card,
+    body.tutor-view .clinical-section,
+    body.tutor-view .table-container,
+    body.public-view .clinic-card-header,
+    body.public-view .cartilla-main-grid,
+    body.public-view .cartilla-side-col,
+    body.public-view .cartilla-content-col,
+    body.public-view .cartilla-profile-card,
+    body.public-view .tutor-card,
+    body.public-view .qr-card,
+    body.public-view .clinical-section,
+    body.public-view .table-container {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow-x: hidden !important;
+    }
+
+    body.tutor-view .clinic-card-header,
+    body.tutor-view .cartilla-profile-card,
+    body.tutor-view .tutor-card,
+    body.tutor-view .qr-card,
+    body.tutor-view .clinical-section,
+    body.public-view .clinic-card-header,
+    body.public-view .cartilla-profile-card,
+    body.public-view .tutor-card,
+    body.public-view .qr-card,
+    body.public-view .clinical-section {
+        background: #ffffff !important;
+        color: #1f2937 !important;
+        border-color: #dbe7ef !important;
+        box-shadow: 0 8px 22px rgba(17, 64, 94, 0.07) !important;
+    }
+
+    body.tutor-view .cartilla-main-grid,
+    body.public-view .cartilla-main-grid {
+        width: 100% !important;
+        grid-template-columns: minmax(0, 300px) minmax(0, 1fr) !important;
+        gap: 18px !important;
+    }
+
+    body.tutor-view .cartilla-photo,
+    body.public-view .cartilla-photo {
+        max-width: min(180px, 62vw) !important;
+        width: min(180px, 62vw) !important;
+        height: min(180px, 62vw) !important;
+        object-fit: cover !important;
+    }
+
+    body.tutor-view .cartilla-detail-item,
+    body.public-view .cartilla-detail-item {
+        gap: 10px;
+        min-width: 0;
+    }
+
+    body.tutor-view .cartilla-detail-val,
+    body.tutor-view .tutor-val,
+    body.tutor-view .clinic-text-brand p,
+    body.tutor-view .cartilla-code-num,
+    body.public-view .cartilla-detail-val,
+    body.public-view .tutor-val,
+    body.public-view .clinic-text-brand p,
+    body.public-view .cartilla-code-num {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    body.tutor-view #qrcode,
+    body.tutor-view .qr-box,
+    body.public-view #qrcode,
+    body.public-view .qr-box {
+        width: min(180px, 72vw) !important;
+        min-width: 0 !important;
+        min-height: min(180px, 72vw) !important;
+        height: min(180px, 72vw) !important;
+        margin: 0 auto !important;
+    }
+
+    body.tutor-view #qrcode canvas,
+    body.tutor-view #qrcode img,
+    body.tutor-view .qr-box canvas,
+    body.tutor-view .qr-box img,
+    body.public-view #qrcode canvas,
+    body.public-view #qrcode img,
+    body.public-view .qr-box canvas,
+    body.public-view .qr-box img {
+        max-width: 100% !important;
+        width: min(160px, 64vw) !important;
+        height: min(160px, 64vw) !important;
+        object-fit: contain !important;
+    }
+
+    body.tutor-view img,
+    body.tutor-view canvas,
+    body.public-view img,
+    body.public-view canvas {
+        max-width: 100%;
+    }
+
+    body.tutor-view .clinic-table,
+    body.public-view .clinic-table {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    body.tutor-view .container,
+    body.public-view .container {
+        padding: 10px !important;
+    }
+
+    body.tutor-view .cartilla-main-grid,
+    body.tutor-view .cartilla-side-col,
+    body.tutor-view .cartilla-content-col,
+    body.public-view .cartilla-main-grid,
+    body.public-view .cartilla-side-col,
+    body.public-view .cartilla-content-col {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    body.tutor-view .clinic-card-header,
+    body.public-view .clinic-card-header {
+        display: block !important;
+        text-align: left !important;
+        padding: 18px !important;
+    }
+
+    body.tutor-view .clinic-info-brand,
+    body.public-view .clinic-info-brand {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    body.tutor-view .clinic-text-brand,
+    body.public-view .clinic-text-brand {
+        min-width: 0 !important;
+    }
+
+    body.tutor-view .cartilla-code-badge,
+    body.public-view .cartilla-code-badge {
+        width: 100% !important;
+        margin-top: 14px !important;
+    }
+
+    body.tutor-view .cartilla-profile-card,
+    body.tutor-view .tutor-card,
+    body.tutor-view .qr-card,
+    body.tutor-view .clinical-section,
+    body.public-view .cartilla-profile-card,
+    body.public-view .tutor-card,
+    body.public-view .qr-card,
+    body.public-view .clinical-section {
+        width: 100% !important;
+        margin: 0 0 14px 0 !important;
+        padding: 16px !important;
+    }
+
+    body.tutor-view .qr-card,
+    body.public-view .qr-card {
+        text-align: center !important;
+    }
+
+    body.tutor-view .cartilla-details-list,
+    body.public-view .cartilla-details-list {
+        width: 100% !important;
+    }
+
+    body.tutor-view .cartilla-detail-item,
+    body.public-view .cartilla-detail-item {
+        display: grid !important;
+        grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr) !important;
+        align-items: start !important;
     }
 }
