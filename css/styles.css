@@ -5329,3 +5329,151 @@ body.public-view {
         border-color: #cfd8e3 !important;
     }
 }
+
+/* Correccion urgente: vista tutor solo lectura, PDF limpio y ancho profesional */
+@media screen {
+    body.tutor-view .tutor-hidden-action,
+    body.public-view .tutor-hidden-action,
+    body.tutor-view .no-public,
+    body.public-view .no-public,
+    body.tutor-view .tutor-action,
+    body.public-view .tutor-action,
+    body.tutor-view .copy-link-btn,
+    body.public-view .copy-link-btn,
+    body.tutor-view .whatsapp-btn,
+    body.public-view .whatsapp-btn,
+    body.tutor-view .record-actions,
+    body.public-view .record-actions,
+    body.tutor-view .admin-actions,
+    body.public-view .admin-actions,
+    body.tutor-view .edit-btn,
+    body.public-view .edit-btn,
+    body.tutor-view .delete-btn,
+    body.public-view .delete-btn,
+    body.tutor-view .reschedule-btn,
+    body.public-view .reschedule-btn,
+    body.tutor-view .calendar-btn,
+    body.public-view .calendar-btn,
+    body.tutor-view #section-cartilla [onclick^="abrirEditar"],
+    body.public-view #section-cartilla [onclick^="abrirEditar"],
+    body.tutor-view #section-cartilla [onclick^="confirmarEliminar"],
+    body.public-view #section-cartilla [onclick^="confirmarEliminar"],
+    body.tutor-view #section-cartilla [onclick^="abrirMenuEstado"],
+    body.public-view #section-cartilla [onclick^="abrirMenuEstado"],
+    body.tutor-view #section-cartilla [onclick^="copiarEnlaceCartilla"],
+    body.public-view #section-cartilla [onclick^="copiarEnlaceCartilla"],
+    body.tutor-view #section-cartilla [onclick^="compartirWhatsApp"],
+    body.public-view #section-cartilla [onclick^="compartirWhatsApp"] {
+        display: none !important;
+    }
+
+    body.tutor-view #section-cartilla [onclick^="imprimirCartilla"],
+    body.public-view #section-cartilla [onclick^="imprimirCartilla"] {
+        display: inline-flex !important;
+        visibility: visible !important;
+    }
+
+    body.tutor-view .cartilla-actions,
+    body.public-view .cartilla-actions {
+        justify-content: center !important;
+        margin-bottom: 18px !important;
+    }
+
+    body.tutor-view .cartilla-action-buttons,
+    body.public-view .cartilla-action-buttons {
+        justify-content: center !important;
+        width: 100% !important;
+    }
+}
+
+@media screen and (min-width: 1024px) {
+    body.tutor-view .container,
+    body.public-view .container {
+        width: min(1180px, calc(100% - 32px)) !important;
+        max-width: 1180px !important;
+        margin: 0 auto !important;
+        padding: 18px 0 !important;
+        overflow: visible !important;
+    }
+
+    body.tutor-view #section-cartilla,
+    body.public-view #section-cartilla {
+        width: 100% !important;
+        max-width: 1180px !important;
+        margin: 0 auto !important;
+        overflow: visible !important;
+    }
+
+    body.tutor-view .cartilla-main-grid,
+    body.public-view .cartilla-main-grid {
+        display: grid !important;
+        grid-template-columns: minmax(320px, 380px) minmax(0, 1fr) !important;
+        gap: 24px !important;
+        align-items: start !important;
+    }
+
+    body.tutor-view .cartilla-side-col,
+    body.public-view .cartilla-side-col,
+    body.tutor-view .cartilla-content-col,
+    body.public-view .cartilla-content-col,
+    body.tutor-view .clinical-section,
+    body.public-view .clinical-section,
+    body.tutor-view .records-section,
+    body.public-view .records-section {
+        min-width: 0 !important;
+        width: 100% !important;
+        overflow: visible !important;
+    }
+
+    body.tutor-view .table-container,
+    body.public-view .table-container {
+        width: 100% !important;
+        overflow-x: visible !important;
+    }
+
+    body.tutor-view .clinic-table,
+    body.public-view .clinic-table,
+    body.tutor-view table,
+    body.public-view table {
+        width: 100% !important;
+        table-layout: auto !important;
+    }
+}
+
+@media print {
+    .cartilla-actions,
+    .cartilla-action-buttons,
+    .share-actions,
+    .tutor-action,
+    .copy-link-btn,
+    .whatsapp-btn,
+    .print-btn,
+    .tutor-print-btn,
+    .record-actions,
+    .admin-actions,
+    .edit-btn,
+    .delete-btn,
+    .reschedule-btn,
+    .calendar-btn,
+    .tutor-hidden-action,
+    .no-print,
+    button {
+        display: none !important;
+    }
+
+    body {
+        background: #ffffff !important;
+    }
+
+    .cartilla-container,
+    .public-cartilla,
+    .cartilla-print,
+    .container,
+    #section-cartilla {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+    }
+}

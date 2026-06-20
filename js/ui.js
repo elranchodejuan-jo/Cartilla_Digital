@@ -488,6 +488,42 @@ function configurarModoPublico(activar) {
         }
         delete document.body.dataset.tutorPreviousTheme;
     }
+    sincronizarAccionesCartillaTutor();
+}
+
+function esVistaTutorPublica() {
+    return Boolean(
+        UIState.modoPublico ||
+        document.body.classList.contains('public-view') ||
+        document.body.classList.contains('tutor-view')
+    );
+}
+
+function sincronizarAccionesCartillaTutor() {
+    const esTutor = esVistaTutorPublica();
+    const controlesRestringidos = document.querySelectorAll(
+        '#section-cartilla .no-public, ' +
+        '#section-cartilla .tutor-action, ' +
+        '#section-cartilla [onclick^="abrirEditar"], ' +
+        '#section-cartilla [onclick^="confirmarEliminar"], ' +
+        '#section-cartilla [onclick^="abrirMenuEstado"], ' +
+        '#section-cartilla [onclick^="iniciarTransferenciaMascota"], ' +
+        '#section-cartilla [onclick^="copiarEnlaceCartilla"], ' +
+        '#section-cartilla [onclick^="compartirWhatsApp"]'
+    );
+
+    controlesRestringidos.forEach(el => {
+        el.hidden = esTutor;
+        el.setAttribute('aria-hidden', String(esTutor));
+        el.classList.toggle('tutor-hidden-action', esTutor);
+    });
+
+    const botonImprimir = document.querySelector('#section-cartilla [onclick^="imprimirCartilla"]');
+    if (botonImprimir) {
+        botonImprimir.hidden = false;
+        botonImprimir.removeAttribute('aria-hidden');
+        botonImprimir.classList.remove('tutor-hidden-action');
+    }
 }
 
 /**
@@ -1463,6 +1499,7 @@ async function verCartillaMascota(id) {
     
     // Historiales clínicos
     renderizarHistorialesCartilla(mascota);
+    sincronizarAccionesCartillaTutor();
     
     // QR Code
     generarQRCartilla(mascota);
@@ -2264,6 +2301,7 @@ async function verCartillaMascotaPublica(id) {
         
         // Historiales clínicos
         renderizarHistorialesCartilla(mascota);
+        sincronizarAccionesCartillaTutor();
         
         // QR Code
         generarQRCartilla(mascota);
