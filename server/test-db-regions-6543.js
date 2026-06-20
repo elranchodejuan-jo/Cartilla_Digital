@@ -19,34 +19,42 @@ const regions = [
     'ap-south-1'
 ];
 
+const required = ['DB_PASSWORD', 'SUPABASE_PROJECT_REF'];
+const missing = required.filter(key => !process.env[key]);
+
+if (missing.length) {
+    console.error(`Faltan variables para diagnostico regional: ${missing.join(', ')}`);
+    process.exit(1);
+}
+
 async function testRegions() {
     for (const region of regions) {
         const host = `aws-0-${region}.pooler.supabase.com`;
-        console.log(`Probando región (Puerto 6543): ${region} (${host})...`);
+        console.log(`Probando region por puerto 6543: ${region} (${host})...`);
         const client = new Client({
-            user: 'postgres.ljvhnbbtlofdolwyoddn',
+            user: `postgres.${process.env.SUPABASE_PROJECT_REF}`,
             password: process.env.DB_PASSWORD,
-            host: host,
+            host,
             port: 6543,
-            database: 'postgres',
+            database: process.env.DB_NAME || 'postgres',
             ssl: { rejectUnauthorized: false },
             connectionTimeoutMillis: 5000
         });
-        
+
         try {
             await client.connect();
-            console.log(`✅ ¡CONEXIÓN EXITOSA en la región (Puerto 6543): ${region}!`);
+            console.log(`Conexion exitosa en region ${region} por puerto 6543.`);
             const res = await client.query('SELECT NOW()');
             console.log(`Hora del servidor: ${res.rows[0].now}`);
             await client.end();
             return;
         } catch (err) {
-            console.log(`❌ Falló ${region}: ${err.message}`);
-            try { await client.end(); } catch(e) {}
+            console.log(`Fallo ${region}: ${err.message}`);
+            try { await client.end(); } catch (e) {}
         }
         console.log('--------------------------------------------------');
     }
-    console.log('Ninguna de las regiones en puerto 6543 pudo conectar.');
+    console.log('Ninguna region en puerto 6543 pudo conectar.');
 }
 
 testRegions();

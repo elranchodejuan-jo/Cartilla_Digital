@@ -1,66 +1,62 @@
 const { Client } = require('pg');
 require('dotenv').config();
 
-const password = process.env.DB_PASSWORD || '123JuanJo456&_&_';
-const projectRef = 'ljvhnbbtlofdolwyoddn';
-const host = 'aws-0-us-west-2.pooler.supabase.com';
+const required = ['DB_PASSWORD', 'SUPABASE_PROJECT_REF', 'SUPABASE_POOLER_HOST'];
+const missing = required.filter(key => !process.env[key]);
+
+if (missing.length) {
+    console.error(`Faltan variables para el diagnostico: ${missing.join(', ')}`);
+    console.error('No se ejecuta ninguna prueba sin credenciales explicitas en server/.env.');
+    process.exit(1);
+}
+
+const password = process.env.DB_PASSWORD;
+const projectRef = process.env.SUPABASE_PROJECT_REF;
+const host = process.env.SUPABASE_POOLER_HOST;
+const database = process.env.DB_NAME || 'postgres';
 
 const configs = [
     {
-        name: 'Config 1: User with project ref, Port 5432, Direct Options',
+        name: 'Pooler 5432 con usuario postgres.<project-ref>',
         clientOpts: {
             user: `postgres.${projectRef}`,
-            password: password,
-            host: host,
+            password,
+            host,
             port: 5432,
-            database: 'postgres',
+            database,
             ssl: { rejectUnauthorized: false }
         }
     },
     {
-        name: 'Config 2: User with project ref, Port 6543, Direct Options',
+        name: 'Pooler 6543 con usuario postgres.<project-ref>',
         clientOpts: {
             user: `postgres.${projectRef}`,
-            password: password,
-            host: host,
+            password,
+            host,
             port: 6543,
-            database: 'postgres',
+            database,
             ssl: { rejectUnauthorized: false }
         }
     },
     {
-        name: 'Config 3: User ONLY postgres, Port 5432, Direct Options',
+        name: 'Pooler 5432 con usuario DB_USER',
         clientOpts: {
-            user: 'postgres',
-            password: password,
-            host: host,
+            user: process.env.DB_USER || 'postgres',
+            password,
+            host,
             port: 5432,
-            database: 'postgres',
+            database,
             ssl: { rejectUnauthorized: false }
         }
     },
     {
-        name: 'Config 4: User ONLY postgres, Port 6543, Direct Options',
+        name: 'Pooler 6543 con usuario DB_USER',
         clientOpts: {
-            user: 'postgres',
-            password: password,
-            host: host,
+            user: process.env.DB_USER || 'postgres',
+            password,
+            host,
             port: 6543,
-            database: 'postgres',
-            ssl: { rejectUnauthorized: false }
-        }
-    },
-    {
-        name: 'Config 5: URI format, Port 6543, URL Encoded Password',
-        clientOpts: {
-            connectionString: `postgresql://postgres.${projectRef}:${encodeURIComponent(password)}@${host}:6543/postgres`,
-            ssl: { rejectUnauthorized: false }
-        }
-    },
-    {
-        name: 'Config 6: URI format, Port 5432, URL Encoded Password',
-        clientOpts: {
-            connectionString: `postgresql://postgres.${projectRef}:${encodeURIComponent(password)}@${host}:5432/postgres`,
+            database,
             ssl: { rejectUnauthorized: false }
         }
     }
@@ -68,22 +64,21 @@ const configs = [
 
 async function runTests() {
     for (const config of configs) {
-        console.log(`Running: ${config.name}...`);
+        console.log(`Probando: ${config.name}...`);
         const client = new Client(config.clientOpts);
         try {
             await client.connect();
-            console.log(`✅ SUCCESS! Connected to DB!`);
+            console.log('Conexion exitosa.');
             const res = await client.query('SELECT NOW()');
-            console.log(`Server time: ${res.rows[0].now}`);
+            console.log(`Hora del servidor: ${res.rows[0].now}`);
             await client.end();
-            console.log(`Connection closed successfully.\n`);
-            return; // Stop on first success
+            return;
         } catch (err) {
-            console.log(`❌ FAILED: ${err.message} (Code: ${err.code})\n`);
+            console.log(`Fallo: ${err.message} (Code: ${err.code || 'sin codigo'})`);
             try { await client.end(); } catch (e) {}
         }
     }
-    console.log('All connection configurations failed.');
+    console.log('Ninguna configuracion pudo conectar.');
 }
 
 runTests();

@@ -1,19 +1,26 @@
-# Dependencias de Node (no deben subirse a Git)
+# Node dependencies
 node_modules/
+server/node_modules/
 
-# Archivos de sistema y logs
+# System files and logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 .DS_Store
 Thumbs.db
 
-# Directorios de configuración del asistente o archivos temporales
+# Local assistant/runtime artifacts
 .gemini/
+.codex-run/
 scratch/
 
-# Variables de entorno y credenciales sensibles
+# Environment files and sensitive credentials
 .env
 .env.local
+.env.*.local
 server/.env
 server/.env.local
+server/.env.*.local
+!server/.env.example
+!server/.env.template

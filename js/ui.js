@@ -273,10 +273,12 @@ function configurarSidebarClinico() {
             ? document.body.classList.contains('sidebar-open')
             : !document.body.classList.contains('sidebar-collapsed');
         sidebarToggle.setAttribute('aria-expanded', String(expandido));
+        if (backdrop) backdrop.setAttribute('aria-hidden', String(!document.body.classList.contains('sidebar-open')));
     };
 
     window.cerrarSidebarMovil = function() {
         document.body.classList.remove('sidebar-open');
+        if (backdrop) backdrop.setAttribute('aria-hidden', 'true');
         if (esSidebarMovil()) sincronizarEstadoSidebar();
     };
     if (sidebarToggle) sidebarToggle.addEventListener('click', () => {

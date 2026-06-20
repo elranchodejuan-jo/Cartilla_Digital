@@ -1,25 +1,35 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-console.log('Testing direct IPv6 connection...');
-console.log('IP:', '2600:1f14:359d:9301:d34d:1575:9756:c6a4');
+const required = ['DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_NAME'];
+const missing = required.filter(key => !process.env[key]);
+
+if (missing.length) {
+    console.error(`Faltan variables de conexion: ${missing.join(', ')}`);
+    process.exit(1);
+}
+
+console.log('Probando conexion PostgreSQL con variables DB_*...');
+
+const sslValue = (process.env.DB_SSL || '').toLowerCase();
+const ssl = ['1', 'true', 'yes', 'require'].includes(sslValue)
+    ? { rejectUnauthorized: false }
+    : false;
 
 const pool = new Pool({
-    user: 'postgres',
+    user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    host: '2600:1f14:359d:9301:d34d:1575:9756:c6a4',
-    port: 5432,
-    database: 'postgres',
-    ssl: {
-        rejectUnauthorized: false
-    }
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
+    database: process.env.DB_NAME,
+    ssl
 });
 
 pool.query('SELECT NOW()', (err, res) => {
     if (err) {
-        console.error('Connection failed:', err.message);
+        console.error('Conexion fallida:', err.message);
     } else {
-        console.log('Connection successful! Server time:', res.rows[0].now);
+        console.log('Conexion exitosa. Hora del servidor:', res.rows[0].now);
     }
     pool.end();
 });

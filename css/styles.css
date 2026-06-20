@@ -3999,3 +3999,333 @@ body.dark-theme .support-status-cerrado {
         grid-template-columns: 1fr;
     }
 }
+
+/* --- Fase 1: estabilizacion responsive SaaS --- */
+img,
+video,
+canvas {
+    max-width: 100%;
+}
+
+input,
+select,
+textarea,
+.form-control {
+    font-size: max(16px, 1rem);
+}
+
+.section-header,
+.dashboard-title-bar {
+    gap: 14px;
+}
+
+.dashboard-title-bar h1,
+.section-header h2,
+.form-title {
+    overflow-wrap: anywhere;
+}
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-container table {
+    min-width: 720px;
+}
+
+.qr-container,
+#qr-code,
+#print-qr-code {
+    display: grid;
+    place-items: center;
+}
+
+#qr-code canvas,
+#qr-code img,
+#print-qr-code canvas,
+#print-qr-code img {
+    width: 150px !important;
+    height: 150px !important;
+    border-radius: 0 !important;
+    image-rendering: pixelated;
+}
+
+.modal-overlay.active {
+    padding: 14px;
+}
+
+.modal-content,
+.modal .modal-content {
+    width: min(720px, calc(100vw - 28px));
+    max-height: min(88dvh, 760px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.btn,
+.filter-btn,
+.nav-btn {
+    min-height: 44px;
+}
+
+@media (max-width: 768px) {
+    body {
+        font-size: 16px;
+    }
+
+    .clinical-sidebar {
+        width: min(88vw, 340px) !important;
+        min-width: 0 !important;
+        max-width: 340px !important;
+        padding: calc(14px + env(safe-area-inset-top)) 14px 16px !important;
+        gap: 12px !important;
+    }
+
+    .sidebar-clinic-card {
+        align-items: flex-start;
+        text-align: left;
+        padding: 12px !important;
+    }
+
+    .sidebar-clinic-logo-wrap {
+        width: 46px !important;
+        height: 46px !important;
+        border-radius: 12px !important;
+    }
+
+    .sidebar-clinic-copy h2 {
+        font-size: 1rem !important;
+        line-height: 1.2;
+    }
+
+    .sidebar-clinic-copy p {
+        font-size: 0.9rem !important;
+    }
+
+    .sidebar-nav {
+        gap: 7px !important;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .clinical-sidebar .nav-btn,
+    .nav-subitem {
+        min-height: 48px;
+        width: 100%;
+        justify-content: flex-start;
+        border-radius: 12px;
+        font-size: 1rem !important;
+    }
+
+    .nav-submenu {
+        padding-left: 0 !important;
+        margin: 6px 0 2px;
+        gap: 6px;
+    }
+
+    .nav-subitem {
+        padding: 10px 12px 10px 42px;
+        background: rgba(11, 111, 179, 0.06);
+    }
+
+    .sidebar-toggle {
+        position: fixed;
+        top: calc(14px + env(safe-area-inset-top));
+        left: 14px;
+        z-index: 112;
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+    }
+
+    body.sidebar-open .sidebar-toggle {
+        z-index: 170;
+    }
+
+    .app-header {
+        min-height: 78px;
+        padding: calc(12px + env(safe-area-inset-top)) 58px 14px !important;
+        position: sticky;
+        top: 0;
+        z-index: 90;
+        background: rgba(238, 244, 248, 0.94);
+        backdrop-filter: blur(14px);
+    }
+
+    .brand-header {
+        max-width: 100%;
+    }
+
+    .brand-title {
+        font-size: clamp(1.25rem, 6vw, 1.65rem) !important;
+    }
+
+    .brand-subtitle {
+        font-size: 0.88rem !important;
+    }
+
+    .container {
+        padding-inline: 14px !important;
+    }
+
+    .dashboard-title-bar,
+    .section-header {
+        align-items: stretch !important;
+        text-align: left;
+    }
+
+    .dashboard-title-bar > *,
+    .section-header > * {
+        min-width: 0;
+    }
+
+    .dashboard-title-bar .btn,
+    .section-header .btn,
+    .dashboard-filters .btn,
+    .filter-group .filter-btn {
+        width: 100%;
+    }
+
+    .dashboard-grid,
+    .alerts-grid,
+    .patients-grid,
+    .support-stats,
+    .transfer-summary-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .stat-card,
+    .patient-card,
+    .support-panel,
+    .transfer-summary-card {
+        border-radius: 12px;
+    }
+
+    .stat-card {
+        min-height: 112px;
+        padding: 18px;
+    }
+
+    .stat-number {
+        font-size: clamp(2rem, 10vw, 2.8rem);
+    }
+
+    .dashboard-filters,
+    .filter-group,
+    .support-filters {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .search-input,
+    .form-control {
+        min-height: 46px;
+        font-size: 16px;
+    }
+
+    .patient-card-header,
+    .patient-card-actions,
+    .support-ticket-card,
+    .transfer-patient-card,
+    .transfer-mailbox-item {
+        align-items: stretch;
+    }
+
+    .patient-card-actions .btn,
+    .support-ticket-card .btn,
+    .transfer-patient-card .btn {
+        width: 100%;
+    }
+
+    .cartilla-main-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px;
+    }
+
+    .cartilla-profile-card,
+    .clinical-section {
+        border-radius: 12px;
+    }
+
+    .cartilla-photo {
+        width: min(190px, 58vw);
+        height: min(190px, 58vw);
+    }
+
+    .cartilla-details-list,
+    .tutor-info-grid,
+    .transfer-review-grid,
+    .support-detail-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    #qr-code canvas,
+    #qr-code img {
+        width: 170px !important;
+        height: 170px !important;
+    }
+
+    .modal-content,
+    .modal .modal-content {
+        width: calc(100vw - 24px) !important;
+        max-height: 86dvh;
+        border-radius: 14px;
+    }
+
+    .modal-header {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--card-bg);
+    }
+
+    .modal-body {
+        padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding-inline: 10px !important;
+    }
+
+    .app-section {
+        min-width: 0;
+    }
+
+    .brand-logo-img {
+        display: none;
+    }
+
+    .brand-title {
+        font-size: clamp(1.12rem, 7vw, 1.42rem) !important;
+    }
+
+    .brand-subtitle {
+        display: none;
+    }
+
+    .btn,
+    .filter-btn {
+        width: 100%;
+        padding-inline: 14px;
+    }
+
+    .cartilla-code-badge {
+        width: 100%;
+    }
+}
+
+@media print {
+    #qr-code canvas,
+    #qr-code img,
+    #print-qr-code canvas,
+    #print-qr-code img {
+        width: 132px !important;
+        height: 132px !important;
+        border-radius: 0 !important;
+    }
+}

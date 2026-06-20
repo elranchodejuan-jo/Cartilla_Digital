@@ -636,3 +636,87 @@ button {
         white-space: normal;
     }
 }
+
+/* --- Fase 1: estabilizacion responsive Admin Center --- */
+.admin-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.admin-input,
+.admin-select,
+.admin-theme,
+.admin-link,
+.admin-logout,
+.admin-action,
+.admin-filter-btn {
+    min-height: 44px;
+}
+
+@media (max-width: 860px) {
+    .admin-sidebar {
+        width: min(86vw, 320px);
+        max-width: 320px;
+        padding: calc(14px + env(safe-area-inset-top)) 14px 16px;
+    }
+
+    .admin-nav-btn {
+        min-height: 46px;
+        font-size: 15px;
+    }
+
+    .admin-main {
+        padding: calc(12px + env(safe-area-inset-top)) 14px 34px;
+    }
+
+    .admin-header {
+        position: sticky;
+        top: 0;
+        z-index: 15;
+        align-items: flex-start;
+        padding: 10px 0 12px;
+        background: rgba(246, 248, 251, 0.94);
+        backdrop-filter: blur(14px);
+    }
+
+    body.dark-theme .admin-header {
+        background: rgba(2, 6, 23, 0.92);
+    }
+
+    .admin-header h1 {
+        font-size: clamp(24px, 8vw, 32px);
+    }
+
+    .admin-header-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        width: 100%;
+    }
+
+    .admin-backdrop {
+        backdrop-filter: blur(2px);
+    }
+}
+
+@media (max-width: 620px) {
+    .admin-userbar,
+    .admin-status,
+    .admin-view {
+        max-width: 100%;
+    }
+
+    .admin-panel-body {
+        padding: 14px;
+    }
+
+    .admin-table td {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .admin-table td::before {
+        max-width: 100%;
+    }
+}
