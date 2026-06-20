@@ -308,6 +308,7 @@ function configurarManejadoresFormularios() {
             const fechaNacimiento = document.getElementById('pet-nacimiento').value;
             const color = document.getElementById('pet-color').value.trim();
             const peso = document.getElementById('pet-peso').value.trim();
+            const esterilizado = document.getElementById('pet-esterilizado')?.value === 'true';
             const tutorNombre = document.getElementById('pet-tutor').value.trim();
             const tutorTel = document.getElementById('pet-tutor-tel').value.trim();
             const tutorEmail = normalizarEmailFormulario(document.getElementById('pet-tutor-email')?.value || '');
@@ -327,6 +328,7 @@ function configurarManejadoresFormularios() {
                 fechaNacimiento,
                 color,
                 peso: peso ? parseFloat(peso) : '',
+                esterilizado,
                 foto: UIState.fotoMascotaBase64,
                 tutor: {
                     nombre: tutorNombre,

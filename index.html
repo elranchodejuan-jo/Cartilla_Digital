@@ -682,6 +682,13 @@
                             <input type="number" id="pet-peso" class="form-control" step="0.01" min="0" placeholder="Ej. 14.5">
                         </div>
                         <div class="form-group">
+                            <label for="pet-esterilizado">Esterilizado</label>
+                            <select id="pet-esterilizado" class="form-control">
+                                <option value="false" selected>No</option>
+                                <option value="true">Sí</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>Foto de la Mascota</label>
                             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('pet-photo-gallery').click();" style="flex:1;">📁 Galería</button>
@@ -880,7 +887,7 @@
                             </div>
                             <div class="cartilla-detail-item">
                                 <span class="cartilla-detail-lbl">Esterilizado:</span>
-                                <span class="cartilla-detail-val" id="cartilla-pet-esterilizado">N/A</span>
+                                <span class="cartilla-detail-val" id="cartilla-pet-esterilizado">No</span>
                             </div>
                         </div>
                     </div>

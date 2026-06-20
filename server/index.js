@@ -82,6 +82,12 @@ function esEmailValido(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
 }
 
+function normalizarEsterilizado(valor) {
+    if (typeof valor === 'boolean') return valor;
+    const texto = String(valor || '').trim().toLowerCase();
+    return ['true', 'si', 'sí', 's', 'yes'].includes(texto);
+}
+
 async function sincronizarPropietarioConEquipo(veterinariaId, propietario, queryable = db) {
     const nombrePropietario = normalizarTextoPerfil(propietario);
     if (!nombrePropietario) return;
@@ -538,6 +544,7 @@ app.get('/api/mascotas', authMiddleware, async (req, res) => {
             fechaNacimiento: row.fecha_nacimiento.toISOString().split('T')[0],
             color: row.color || '',
             peso: row.peso || '',
+            esterilizado: !!row.esterilizado,
             foto: row.foto || '',
             sourcePatientCode: row.source_patient_code || '',
             receivedByTransfer: !!row.received_by_transfer,
@@ -939,7 +946,7 @@ app.post('/api/importacion/pacientes', authMiddleware, async (req, res) => {
  * Registrar mascota (paciente)
  */
 app.post('/api/mascotas', authMiddleware, async (req, res) => {
-    const { nombre, especie, raza, sexo, fechaNacimiento, color, peso, foto, tutor, observaciones } = req.body;
+    const { nombre, especie, raza, sexo, fechaNacimiento, color, peso, esterilizado, foto, tutor, observaciones } = req.body;
     const tutorEmail = normalizarEmail(tutor?.email);
     
     if (!nombre || !especie || !fechaNacimiento || !tutor?.nombre) {
@@ -998,8 +1005,8 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
         // 3. Insertar mascota
         const insertQuery = `
             INSERT INTO mascotas 
-            (codigo, veterinaria_iniciales, veterinaria_id, nombre, especie, raza, sexo, fecha_nacimiento, color, peso, foto_base64, tutor_nombre, tutor_telefono, tutor_email, tutor_direccion, observaciones, code_species, code_date, code_counter)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+            (codigo, veterinaria_iniciales, veterinaria_id, nombre, especie, raza, sexo, fecha_nacimiento, color, peso, esterilizado, foto_base64, tutor_nombre, tutor_telefono, tutor_email, tutor_direccion, observaciones, code_species, code_date, code_counter)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
             RETURNING *
         `;
         const fotoFinal = await subirImagenAStorage(foto, 'mascotas');
@@ -1014,6 +1021,7 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
             fechaNacimiento,
             color ? color.trim() : '',
             peso !== undefined && peso !== '' ? parseFloat(peso) : null,
+            normalizarEsterilizado(esterilizado),
             fotoFinal || '',
             tutor.nombre.trim(),
             tutor.telefono ? tutor.telefono.trim() : '',
@@ -1040,6 +1048,7 @@ app.post('/api/mascotas', authMiddleware, async (req, res) => {
             fechaNacimiento: row.fecha_nacimiento.toISOString().split('T')[0],
             color: row.color || '',
             peso: row.peso || '',
+            esterilizado: !!row.esterilizado,
             foto: row.foto_base64 || '',
             sourcePatientCode: row.source_patient_code || '',
             receivedByTransfer: !!row.received_by_transfer,
@@ -1147,6 +1156,7 @@ app.get('/api/mascotas/:id', authMiddleware, async (req, res) => {
             fechaNacimiento: row.fecha_nacimiento.toISOString().split('T')[0],
             color: row.color || '',
             peso: row.peso || '',
+            esterilizado: !!row.esterilizado,
             foto: row.foto_base64 || '',
             sourcePatientCode: row.source_patient_code || '',
             receivedByTransfer: !!row.received_by_transfer,
@@ -1173,7 +1183,7 @@ app.get('/api/mascotas/:id', authMiddleware, async (req, res) => {
  */
 app.put('/api/mascotas/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { nombre, especie, raza, sexo, fechaNacimiento, color, peso, foto, tutor, observaciones } = req.body;
+    const { nombre, especie, raza, sexo, fechaNacimiento, color, peso, esterilizado, foto, tutor, observaciones } = req.body;
     
     try {
         const mCheck = await db.query('SELECT * FROM mascotas WHERE id = $1 AND veterinaria_id = $2', [id, req.veterinaria.id]);
@@ -1191,6 +1201,7 @@ app.put('/api/mascotas/:id', authMiddleware, async (req, res) => {
         const finalFechaNac = fechaNacimiento !== undefined ? fechaNacimiento : orig.fecha_nacimiento;
         const finalColor = color !== undefined ? color.trim() : orig.color;
         const finalPeso = peso !== undefined && peso !== '' ? parseFloat(peso) : (peso === '' ? null : orig.peso);
+        const finalEsterilizado = esterilizado !== undefined ? normalizarEsterilizado(esterilizado) : !!orig.esterilizado;
         let finalFoto = foto !== undefined ? foto : orig.foto_base64;
         // Subir nueva foto a Storage si es Base64
         if (foto !== undefined && foto && foto.startsWith('data:image/')) {
@@ -1213,10 +1224,10 @@ app.put('/api/mascotas/:id', authMiddleware, async (req, res) => {
         
         const updateQuery = `
             UPDATE mascotas
-            SET nombre = $1, especie = $2, raza = $3, sexo = $4, fecha_nacimiento = $5, color = $6, peso = $7, foto_base64 = $8, tutor_nombre = $9, tutor_telefono = $10, tutor_email = $11, tutor_direccion = $12, observaciones = $13
-            WHERE id = $14 AND veterinaria_id = $15
+            SET nombre = $1, especie = $2, raza = $3, sexo = $4, fecha_nacimiento = $5, color = $6, peso = $7, esterilizado = $8, foto_base64 = $9, tutor_nombre = $10, tutor_telefono = $11, tutor_email = $12, tutor_direccion = $13, observaciones = $14
+            WHERE id = $15 AND veterinaria_id = $16
         `;
-        const values = [finalNombre, finalEspecie, finalRaza, finalSexo, finalFechaNac, finalColor, finalPeso, finalFoto, finalTutorNombre, finalTutorTel, finalTutorEmail || null, finalTutorDir, finalObs, id, req.veterinaria.id];
+        const values = [finalNombre, finalEspecie, finalRaza, finalSexo, finalFechaNac, finalColor, finalPeso, finalEsterilizado, finalFoto, finalTutorNombre, finalTutorTel, finalTutorEmail || null, finalTutorDir, finalObs, id, req.veterinaria.id];
         await db.query(updateQuery, values);
         
         res.json({ mensaje: 'Paciente actualizado con éxito.' });
@@ -2720,6 +2731,7 @@ app.get('/api/public/mascotas/:id', async (req, res) => {
             fechaNacimiento: row.fecha_nacimiento.toISOString().split('T')[0],
             color: row.color || '',
             peso: row.peso || '',
+            esterilizado: !!row.esterilizado,
             foto: row.foto_base64 || '',
             tutor: {
                 nombre: row.tutor_nombre,

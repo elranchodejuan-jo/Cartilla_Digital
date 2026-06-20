@@ -56,12 +56,20 @@ function construirContactoClinica(vet = {}) {
 function obtenerEsterilizadoMascota(mascota = {}) {
     const directo = mascota.esterilizado ?? mascota.esterilizada;
     if (directo !== undefined && directo !== null && directo !== '') {
-        if (typeof directo === 'boolean') return directo ? 'Si' : 'No';
-        return obtenerValorCartilla(directo);
+        if (typeof directo === 'boolean') return directo ? 'Sí' : 'No';
+        const texto = String(directo).trim().toLowerCase();
+        if (['true', 'si', 'sí', 's', 'yes'].includes(texto)) return 'Sí';
+        if (['false', 'no', 'n'].includes(texto)) return 'No';
+        return obtenerValorCartilla(directo, 'No');
     }
     const observaciones = mascota.observaciones || '';
     const match = String(observaciones).match(/Esterilizado:\s*([^\n\r]+)/i);
-    return match ? obtenerValorCartilla(match[1]) : 'N/A';
+    if (match) {
+        const texto = String(match[1]).trim().toLowerCase();
+        if (['true', 'si', 'sí', 's', 'yes'].includes(texto)) return 'Sí';
+        if (['false', 'no', 'n'].includes(texto)) return 'No';
+    }
+    return 'No';
 }
 
 function aplicarDatosClinicaCartilla(vet = {}) {
@@ -740,6 +748,8 @@ async function prepararFormularioMascota() {
     DOM.formMascota.reset();
     UIState.mascotaEdicionId = null;
     UIState.fotoMascotaBase64 = '';
+    const esterilizadoSelect = document.getElementById('pet-esterilizado');
+    if (esterilizadoSelect) esterilizadoSelect.value = 'false';
     
     const preview = document.getElementById('pet-photo-preview');
     const placeholder = document.getElementById('pet-photo-placeholder');
@@ -1389,6 +1399,8 @@ async function prepararEdicionMascota(id) {
     document.getElementById('pet-nacimiento').value = mascota.fechaNacimiento;
     document.getElementById('pet-color').value = mascota.color || '';
     document.getElementById('pet-peso').value = mascota.peso || '';
+    const esterilizadoSelect = document.getElementById('pet-esterilizado');
+    if (esterilizadoSelect) esterilizadoSelect.value = obtenerEsterilizadoMascota(mascota) === 'Sí' ? 'true' : 'false';
     document.getElementById('pet-tutor').value = mascota.tutor.nombre;
     document.getElementById('pet-tutor-tel').value = mascota.tutor.telefono || '';
     const tutorEmailInput = document.getElementById('pet-tutor-email');

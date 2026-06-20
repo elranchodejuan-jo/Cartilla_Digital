@@ -23,6 +23,12 @@ function generarUUID() {
     });
 }
 
+function normalizarBooleanoMascota(valor) {
+    if (typeof valor === 'boolean') return valor;
+    const texto = String(valor || '').trim().toLowerCase();
+    return ['true', 'si', 'sí', 's', 'yes'].includes(texto);
+}
+
 /**
  * Valida y sanea el esquema del objeto Mascota.
  */
@@ -41,6 +47,7 @@ function sanearEsquemaMascota(mascota) {
         fechaNacimiento: mascota.fechaNacimiento || new Date().toISOString().split('T')[0],
         color: mascota.color || '',
         peso: mascota.peso ? parseFloat(mascota.peso) : '',
+        esterilizado: normalizarBooleanoMascota(mascota.esterilizado ?? mascota.esterilizada),
         foto: mascota.foto || '',
         sourcePatientCode: mascota.sourcePatientCode || mascota.source_patient_code || '',
         receivedByTransfer: !!(mascota.receivedByTransfer || mascota.received_by_transfer),

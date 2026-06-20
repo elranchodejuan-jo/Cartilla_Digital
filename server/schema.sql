@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS mascotas (
     fecha_nacimiento DATE NOT NULL,
     color VARCHAR(100),
     peso NUMERIC(6, 2),
+    esterilizado BOOLEAN DEFAULT false,
     foto_base64 TEXT,
     tutor_nombre VARCHAR(150) NOT NULL DEFAULT 'Sin Tutor',
     tutor_telefono VARCHAR(50),

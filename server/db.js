@@ -37,7 +37,8 @@ const migrarBaseDatos = async () => {
             ADD COLUMN IF NOT EXISTS tutor_nombre VARCHAR(150) NOT NULL DEFAULT 'Sin Tutor',
             ADD COLUMN IF NOT EXISTS tutor_telefono VARCHAR(50),
             ADD COLUMN IF NOT EXISTS tutor_email TEXT,
-            ADD COLUMN IF NOT EXISTS tutor_direccion TEXT;
+            ADD COLUMN IF NOT EXISTS tutor_direccion TEXT,
+            ADD COLUMN IF NOT EXISTS esterilizado BOOLEAN DEFAULT false;
 
             ALTER TABLE veterinarias
             ADD COLUMN IF NOT EXISTS propietario VARCHAR(150),
