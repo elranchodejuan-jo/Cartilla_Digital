@@ -4402,7 +4402,7 @@ textarea,
 }
 
 body.public-view .tutor-action {
-    display: inline-flex !important;
+    display: none !important;
 }
 
 /* Fase 3: importacion CSV */
@@ -5242,28 +5242,45 @@ body.public-view .tutor-action {
     }
 }
 
-/* Capa final: prioridad visual de cartilla blanca en app, vista tutor e impresion */
-#section-cartilla,
-#section-cartilla .clinic-card-header,
-#section-cartilla .cartilla-profile-card,
-#section-cartilla .tutor-card,
-#section-cartilla .qr-card,
-#section-cartilla .clinical-section,
-#section-cartilla .table-container,
-#section-cartilla .clinic-table,
-#section-cartilla .clinic-table thead,
-#section-cartilla .clinic-table tbody,
-#section-cartilla .clinic-table tr,
-#section-cartilla .clinic-table th,
-#section-cartilla .clinic-table td,
-#section-cartilla .timeline-item,
-#section-cartilla .timeline-details,
-#section-cartilla .timeline-detail-row,
-#section-cartilla .timeline-metric,
-#section-cartilla .empty-state,
-#section-cartilla .qr-box,
+/* Capa final: prioridad visual clara solo en vista tutor/publica e impresion */
 body.tutor-view #section-cartilla,
-body.public-view #section-cartilla {
+body.public-view #section-cartilla,
+body.tutor-view #section-cartilla .clinic-card-header,
+body.public-view #section-cartilla .clinic-card-header,
+body.tutor-view #section-cartilla .cartilla-profile-card,
+body.public-view #section-cartilla .cartilla-profile-card,
+body.tutor-view #section-cartilla .tutor-card,
+body.public-view #section-cartilla .tutor-card,
+body.tutor-view #section-cartilla .qr-card,
+body.public-view #section-cartilla .qr-card,
+body.tutor-view #section-cartilla .clinical-section,
+body.public-view #section-cartilla .clinical-section,
+body.tutor-view #section-cartilla .table-container,
+body.public-view #section-cartilla .table-container,
+body.tutor-view #section-cartilla .clinic-table,
+body.public-view #section-cartilla .clinic-table,
+body.tutor-view #section-cartilla .clinic-table thead,
+body.public-view #section-cartilla .clinic-table thead,
+body.tutor-view #section-cartilla .clinic-table tbody,
+body.public-view #section-cartilla .clinic-table tbody,
+body.tutor-view #section-cartilla .clinic-table tr,
+body.public-view #section-cartilla .clinic-table tr,
+body.tutor-view #section-cartilla .clinic-table th,
+body.public-view #section-cartilla .clinic-table th,
+body.tutor-view #section-cartilla .clinic-table td,
+body.public-view #section-cartilla .clinic-table td,
+body.tutor-view #section-cartilla .timeline-item,
+body.public-view #section-cartilla .timeline-item,
+body.tutor-view #section-cartilla .timeline-details,
+body.public-view #section-cartilla .timeline-details,
+body.tutor-view #section-cartilla .timeline-detail-row,
+body.public-view #section-cartilla .timeline-detail-row,
+body.tutor-view #section-cartilla .timeline-metric,
+body.public-view #section-cartilla .timeline-metric,
+body.tutor-view #section-cartilla .empty-state,
+body.public-view #section-cartilla .empty-state,
+body.tutor-view #section-cartilla .qr-box,
+body.public-view #section-cartilla .qr-box {
     background: #ffffff !important;
     color: #1f2937 !important;
     border-color: #d8e0ea !important;
@@ -5276,31 +5293,50 @@ body.public-view {
     color: #1f2937 !important;
 }
 
-#section-cartilla .section-title,
-#section-cartilla .cartilla-pet-name,
-#section-cartilla .tutor-card-title,
-#section-cartilla .timeline-reason,
-#section-cartilla .timeline-val,
-#section-cartilla .tutor-val,
-#section-cartilla .cartilla-detail-val,
-#section-cartilla .record-value,
-#section-cartilla .info-value,
-#section-cartilla .clinic-table td,
-#section-cartilla .clinic-table small {
+body.tutor-view #section-cartilla .section-title,
+body.public-view #section-cartilla .section-title,
+body.tutor-view #section-cartilla .cartilla-pet-name,
+body.public-view #section-cartilla .cartilla-pet-name,
+body.tutor-view #section-cartilla .tutor-card-title,
+body.public-view #section-cartilla .tutor-card-title,
+body.tutor-view #section-cartilla .timeline-reason,
+body.public-view #section-cartilla .timeline-reason,
+body.tutor-view #section-cartilla .timeline-val,
+body.public-view #section-cartilla .timeline-val,
+body.tutor-view #section-cartilla .tutor-val,
+body.public-view #section-cartilla .tutor-val,
+body.tutor-view #section-cartilla .cartilla-detail-val,
+body.public-view #section-cartilla .cartilla-detail-val,
+body.tutor-view #section-cartilla .record-value,
+body.public-view #section-cartilla .record-value,
+body.tutor-view #section-cartilla .info-value,
+body.public-view #section-cartilla .info-value,
+body.tutor-view #section-cartilla .clinic-table td,
+body.public-view #section-cartilla .clinic-table td,
+body.tutor-view #section-cartilla .clinic-table small,
+body.public-view #section-cartilla .clinic-table small {
     color: #111827 !important;
 }
 
-#section-cartilla .cartilla-detail-lbl,
-#section-cartilla .tutor-lbl,
-#section-cartilla .timeline-lbl,
-#section-cartilla .record-label,
-#section-cartilla .info-label,
-#section-cartilla .clinic-table td::before,
-#section-cartilla .empty-state {
+body.tutor-view #section-cartilla .cartilla-detail-lbl,
+body.public-view #section-cartilla .cartilla-detail-lbl,
+body.tutor-view #section-cartilla .tutor-lbl,
+body.public-view #section-cartilla .tutor-lbl,
+body.tutor-view #section-cartilla .timeline-lbl,
+body.public-view #section-cartilla .timeline-lbl,
+body.tutor-view #section-cartilla .record-label,
+body.public-view #section-cartilla .record-label,
+body.tutor-view #section-cartilla .info-label,
+body.public-view #section-cartilla .info-label,
+body.tutor-view #section-cartilla .clinic-table td::before,
+body.public-view #section-cartilla .clinic-table td::before,
+body.tutor-view #section-cartilla .empty-state,
+body.public-view #section-cartilla .empty-state {
     color: #374151 !important;
 }
 
-#section-cartilla .clinic-table th {
+body.tutor-view #section-cartilla .clinic-table th,
+body.public-view #section-cartilla .clinic-table th {
     background: #f8fafc !important;
     color: #1f2937 !important;
 }
@@ -5475,5 +5511,77 @@ body.public-view {
         margin: 0 !important;
         padding: 0 !important;
         background: #ffffff !important;
+    }
+}
+
+/* Ajuste final solo impresion/PDF: sidebar y QR mas legibles */
+@media print {
+    .cartilla-main-grid {
+        display: grid !important;
+        grid-template-columns: 30% minmax(0, 70%) !important;
+        gap: 8mm !important;
+        align-items: start !important;
+    }
+
+    .cartilla-side-col {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+    }
+
+    .cartilla-content-col {
+        width: 100% !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+    }
+
+    .cartilla-photo {
+        width: 32mm !important;
+        height: 32mm !important;
+        max-width: 32mm !important;
+        max-height: 32mm !important;
+        object-fit: cover !important;
+    }
+
+    .qr-card,
+    .qr-section,
+    .qr-container {
+        width: 100% !important;
+        max-width: none !important;
+        padding: 4mm !important;
+        text-align: center !important;
+    }
+
+    #qrcode,
+    .qr-box,
+    .qr-container {
+        width: 43mm !important;
+        height: auto !important;
+        min-width: 43mm !important;
+        min-height: 43mm !important;
+        max-width: 100% !important;
+        margin: 0 auto !important;
+    }
+
+    #qrcode canvas,
+    #qrcode img,
+    .qr-card canvas,
+    .qr-card img,
+    .qr-section canvas,
+    .qr-section img,
+    .qr-container canvas,
+    .qr-container img {
+        width: 35mm !important;
+        height: 35mm !important;
+        max-width: 35mm !important;
+        max-height: 35mm !important;
+        image-rendering: pixelated;
+    }
+
+    .signature-card,
+    .firma-section,
+    .signature-section {
+        width: 100% !important;
+        margin-top: 4mm !important;
     }
 }
