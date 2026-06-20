@@ -250,6 +250,15 @@ const API = {
         return this.handleResponse(res);
     },
 
+    async importarPacientes(datos) {
+        const res = await fetch(`${API_BASE_URL}/importacion/pacientes`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(datos)
+        });
+        return this.handleResponse(res);
+    },
+
     async obtenerRazas(especie = '') {
         const query = especie ? `?especie=${encodeURIComponent(especie)}` : '';
         const res = await fetch(`${API_BASE_URL}/razas${query}`, {

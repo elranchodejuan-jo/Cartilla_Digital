@@ -37,6 +37,62 @@ function mapearEspecie(especieStr) {
     return especieStr.charAt(0).toUpperCase() + especieStr.slice(1);
 }
 
+function obtenerValorCartilla(valor, fallback = 'N/A') {
+    if (valor === null || valor === undefined) return fallback;
+    const texto = String(valor).trim();
+    return texto ? texto : fallback;
+}
+
+function construirContactoClinica(vet = {}) {
+    const partes = [];
+    if (vet.telefono) partes.push(`Tel: ${vet.telefono}`);
+    if (vet.email) partes.push(`Correo: ${vet.email}`);
+    if (vet.direccion) partes.push(`Direccion: ${vet.direccion}`);
+    if (vet.ciudad || vet.pais) partes.push([vet.ciudad, vet.pais].filter(Boolean).join(', '));
+    if (vet.propietario) partes.push(`Responsable: ${vet.propietario}`);
+    return partes.length ? partes.join(' | ') : 'Datos de contacto no registrados';
+}
+
+function obtenerEsterilizadoMascota(mascota = {}) {
+    const directo = mascota.esterilizado ?? mascota.esterilizada;
+    if (directo !== undefined && directo !== null && directo !== '') {
+        if (typeof directo === 'boolean') return directo ? 'Si' : 'No';
+        return obtenerValorCartilla(directo);
+    }
+    const observaciones = mascota.observaciones || '';
+    const match = String(observaciones).match(/Esterilizado:\s*([^\n\r]+)/i);
+    return match ? obtenerValorCartilla(match[1]) : 'N/A';
+}
+
+function aplicarDatosClinicaCartilla(vet = {}) {
+    document.getElementById('cartilla-clinic-logo').src = vet.logo || vet.logo_base64 || 'assets/logo-placeholder.png';
+    document.getElementById('cartilla-clinic-nombre').textContent = obtenerValorCartilla(vet.nombre, 'Cartilla Digital');
+    document.getElementById('cartilla-clinic-contacto').textContent = construirContactoClinica(vet);
+}
+
+function aplicarDatosMascotaCartilla(mascota) {
+    document.getElementById('cartilla-pet-photo').src = obtenerFotoMascota(mascota);
+    document.getElementById('cartilla-pet-name').textContent = obtenerValorCartilla(mascota.nombre, 'Paciente');
+    document.getElementById('cartilla-pet-especie').textContent = mapearEspecie(mascota.especie);
+    document.getElementById('cartilla-pet-raza').textContent = mascota.raza || 'Mestizo';
+    document.getElementById('cartilla-pet-sexo').textContent = obtenerValorCartilla(mascota.sexo);
+    document.getElementById('cartilla-pet-edad').textContent = calcularEdadMascota(mascota.fechaNacimiento);
+    const nacimientoEl = document.getElementById('cartilla-pet-nacimiento');
+    if (nacimientoEl) nacimientoEl.textContent = mascota.fechaNacimiento ? formatearFechaLocal(mascota.fechaNacimiento) : 'N/A';
+    document.getElementById('cartilla-pet-color').textContent = mascota.color || 'N/A';
+    document.getElementById('cartilla-pet-peso').textContent = mascota.peso ? `${mascota.peso} Kg` : 'N/A';
+    const esterilizadoEl = document.getElementById('cartilla-pet-esterilizado');
+    if (esterilizadoEl) esterilizadoEl.textContent = obtenerEsterilizadoMascota(mascota);
+}
+
+function aplicarDatosTutorCartilla(mascota) {
+    const tutor = mascota.tutor || {};
+    document.getElementById('cartilla-tutor-nombre').textContent = obtenerValorCartilla(tutor.nombre);
+    document.getElementById('cartilla-tutor-telefono').textContent = obtenerValorCartilla(tutor.telefono);
+    document.getElementById('cartilla-tutor-email').textContent = obtenerValorCartilla(tutor.email);
+    document.getElementById('cartilla-tutor-direccion').textContent = obtenerValorCartilla(tutor.direccion);
+}
+
 // Referencias del DOM
 const DOM = {
     secciones: {
@@ -1001,7 +1057,7 @@ function construirEventosPreventivos(mascotas) {
         });
         (mascota.controles || []).forEach(c => {
             if (!c.proximoControl) return;
-            const ec = evaluarEstadoDesparasitacion(c.proximoControl);
+            const ec = obtenerEstadoPreventivoVisual(c.proximoControl, c.status, evaluarEstadoDesparasitacion);
             eventos.push({
                 categoria: 'control',
                 subtipo: 'control',
@@ -1359,6 +1415,7 @@ async function verCartillaMascota(id) {
     document.getElementById('cartilla-clinic-contacto').textContent = `Tel: ${vet.telefono || 'N/A'} | Dirección: ${vet.direccion || 'N/A'}`;
     document.getElementById('cartilla-unique-code').textContent = mascota.codigo;
     actualizarCodigoOrigenCartilla(mascota);
+    aplicarDatosClinicaCartilla(vet);
     
     // Mascota
     document.getElementById('cartilla-pet-photo').src = obtenerFotoMascota(mascota);
@@ -1374,12 +1431,14 @@ async function verCartillaMascota(id) {
     document.getElementById('cartilla-pet-edad').textContent = calcularEdadMascota(mascota.fechaNacimiento);
     document.getElementById('cartilla-pet-color').textContent = mascota.color || 'N/A';
     document.getElementById('cartilla-pet-peso').textContent = mascota.peso ? `${mascota.peso} Kg` : 'N/A';
+    aplicarDatosMascotaCartilla(mascota);
     
     // Tutor
     document.getElementById('cartilla-tutor-nombre').textContent = mascota.tutor.nombre;
     document.getElementById('cartilla-tutor-telefono').textContent = mascota.tutor.telefono || 'N/A';
     document.getElementById('cartilla-tutor-email').textContent = mascota.tutor.email || 'N/A';
     document.getElementById('cartilla-tutor-direccion').textContent = mascota.tutor.direccion || 'N/A';
+    aplicarDatosTutorCartilla(mascota);
     
     // Observaciones
     document.getElementById('cartilla-observaciones-text').textContent = mascota.observaciones || 'Sin observaciones.';
@@ -1716,8 +1775,8 @@ function generarQRCartilla(mascota) {
             if (printQrContainer) {
                 new QRCode(printQrContainer, {
                     text: cartillaUrl,
-                    width: 90,
-                    height: 90,
+                    width: 140,
+                    height: 140,
                     colorDark: "#000000",
                     colorLight: "#FFFFFF",
                     correctLevel: QRCode.CorrectLevel.M
@@ -1731,15 +1790,15 @@ function generarQRCartilla(mascota) {
     
     // QR DE RESPALDO (Canvas Offline Híbrido)
     const canvas = document.createElement('canvas');
-    canvas.width = 150;
-    canvas.height = 150;
+    canvas.width = 180;
+    canvas.height = 180;
     dibujarQROfflineCanvas(canvas, cartillaUrl, mascota.codigo);
     qrContainer.appendChild(canvas);
     
     if (printQrContainer) {
         const printCanvas = document.createElement('canvas');
-        printCanvas.width = 90;
-        printCanvas.height = 90;
+        printCanvas.width = 140;
+        printCanvas.height = 140;
         dibujarQROfflineCanvas(printCanvas, cartillaUrl, mascota.codigo);
         printQrContainer.appendChild(printCanvas);
     }
@@ -1776,11 +1835,14 @@ function copiarEnlaceCartillaFallback(cartillaUrl) {
 
 async function compartirWhatsApp() {
     if (!UIState.mascotaActivaId) return;
-    const mascotas = await obtenerMascotas();
-    const mascota = mascotas.find(m => m.id === UIState.mascotaActivaId);
+    let mascota = UIState.mascotaActivaDetalle;
+    if (!mascota && API.isLoggedIn()) {
+        const mascotas = await obtenerMascotas();
+        mascota = mascotas.find(m => m.id === UIState.mascotaActivaId);
+    }
     if (!mascota) return;
     
-    const vet = obtenerVeterinaria() || { nombre: 'Nuestra Veterinaria' };
+    const vet = mascota.veterinaria || obtenerVeterinaria() || { nombre: 'Nuestra Veterinaria' };
     const cartillaUrl = construirUrlCartillaPublica(mascota.id);
     
     const txt = `Hola. Te comparto la Cartilla Digital de *${mascota.nombre}* (${mascota.especie}), emitida por *${vet.nombre}*.\n\n` +
@@ -1793,7 +1855,7 @@ async function compartirWhatsApp() {
 function imprimirCartilla() {
     const originalTitle = document.title;
     const petName = document.getElementById('cartilla-pet-name').textContent || '';
-    document.title = `Cartilla Digital - Paciente - ${petName}`;
+    document.title = `Cartilla Digital \u2013 Paciente \u2013 ${petName}`;
     window.print();
     setTimeout(() => {
         document.title = originalTitle;
@@ -2150,6 +2212,7 @@ async function verCartillaMascotaPublica(id) {
         const mascota = await API.obtenerMascotaPublica(id);
         
         UIState.mascotaActivaId = id;
+        UIState.mascotaActivaDetalle = mascota;
         const vet = mascota.veterinaria || { nombre: 'Cartilla Digital', iniciales: 'CD', telefono: '', direccion: '', logo: '' };
         
         // Encabezado
@@ -2158,6 +2221,7 @@ async function verCartillaMascotaPublica(id) {
         document.getElementById('cartilla-clinic-contacto').textContent = `Tel: ${vet.telefono || 'N/A'} | Dirección: ${vet.direccion || 'N/A'}`;
         document.getElementById('cartilla-unique-code').textContent = mascota.codigo;
         actualizarCodigoOrigenCartilla(mascota);
+        aplicarDatosClinicaCartilla(vet);
         
         // Mascota
         document.getElementById('cartilla-pet-photo').src = obtenerFotoMascota(mascota);
@@ -2168,12 +2232,14 @@ async function verCartillaMascotaPublica(id) {
         document.getElementById('cartilla-pet-edad').textContent = calcularEdadMascota(mascota.fechaNacimiento);
         document.getElementById('cartilla-pet-color').textContent = mascota.color || 'N/A';
         document.getElementById('cartilla-pet-peso').textContent = mascota.peso ? `${mascota.peso} Kg` : 'N/A';
+        aplicarDatosMascotaCartilla(mascota);
         
         // Tutor
         document.getElementById('cartilla-tutor-nombre').textContent = mascota.tutor.nombre;
         document.getElementById('cartilla-tutor-telefono').textContent = mascota.tutor.telefono || 'N/A';
         document.getElementById('cartilla-tutor-email').textContent = mascota.tutor.email || 'N/A';
         document.getElementById('cartilla-tutor-direccion').textContent = mascota.tutor.direccion || 'N/A';
+        aplicarDatosTutorCartilla(mascota);
         
         // Observaciones
         document.getElementById('cartilla-observaciones-text').textContent = mascota.observaciones || 'Sin observaciones.';

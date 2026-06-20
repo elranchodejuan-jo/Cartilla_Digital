@@ -631,6 +631,310 @@ async function generarCodigoPacienteParaClinica(queryable, clinica, especie, fec
     };
 }
 
+function normalizarFechaImportacion(valor) {
+    const texto = String(valor || '').trim();
+    if (!texto) return '';
+    let match = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+        const fecha = new Date(`${texto}T00:00:00`);
+        if (Number.isNaN(fecha.getTime())) return null;
+        if (fecha.getFullYear() !== Number(match[1]) || fecha.getMonth() + 1 !== Number(match[2]) || fecha.getDate() !== Number(match[3])) {
+            return null;
+        }
+        return texto;
+    }
+    match = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (match) {
+        const dia = match[1].padStart(2, '0');
+        const mes = match[2].padStart(2, '0');
+        const anio = match[3];
+        const iso = `${anio}-${mes}-${dia}`;
+        const fecha = new Date(`${iso}T00:00:00`);
+        if (Number.isNaN(fecha.getTime())) return null;
+        if (fecha.getFullYear() !== Number(anio) || fecha.getMonth() + 1 !== Number(mes) || fecha.getDate() !== Number(dia)) {
+            return null;
+        }
+        return iso;
+    }
+    return null;
+}
+
+function normalizarEspecieImportacion(valor) {
+    const texto = String(valor || '').toLowerCase().trim();
+    if (['c', 'canino', 'perro'].includes(texto)) return 'Canino';
+    if (['f', 'felino', 'gato'].includes(texto)) return 'Felino';
+    return '';
+}
+
+function normalizarSexoImportacion(valor) {
+    const texto = String(valor || '').toLowerCase().trim();
+    if (!texto) return 'Macho';
+    if (['m', 'macho'].includes(texto)) return 'Macho';
+    if (['h', 'hembra', 'f', 'female'].includes(texto)) return 'Hembra';
+    return '';
+}
+
+function textoImportacion(valor) {
+    return String(valor || '').trim();
+}
+
+function hayCamposImportacion(fila, prefijo) {
+    return Object.keys(fila || {}).some(key => key.startsWith(prefijo) && textoImportacion(fila[key]));
+}
+
+function validarFilaImportacionBackend(fila) {
+    const errores = [];
+    const especie = normalizarEspecieImportacion(fila.especie);
+    const sexo = normalizarSexoImportacion(fila.sexo);
+    const fechaNacimiento = normalizarFechaImportacion(fila.fecha_nacimiento);
+    const tutorEmail = normalizarEmail(fila.tutor_email);
+    const pesoRaw = textoImportacion(fila.peso);
+
+    if (!textoImportacion(fila.tutor_nombre)) errores.push('tutor_nombre es requerido.');
+    if (!textoImportacion(fila.mascota_nombre)) errores.push('mascota_nombre es requerido.');
+    if (!especie) errores.push('especie invalida.');
+    if (!sexo) errores.push('sexo invalido.');
+    if (!fechaNacimiento) errores.push('fecha_nacimiento es requerida y debe ser valida.');
+    if (tutorEmail && !esEmailValido(tutorEmail)) errores.push('tutor_email invalido.');
+    if (pesoRaw && (Number.isNaN(Number(pesoRaw)) || Number(pesoRaw) < 0)) errores.push('peso invalido.');
+
+    [
+        'vacuna_fecha',
+        'vacuna_proxima_fecha',
+        'desparasitante_interno_fecha',
+        'desparasitante_interno_proxima_fecha',
+        'desparasitante_externo_fecha',
+        'desparasitante_externo_proxima_fecha',
+        'control_preventivo_fecha',
+        'control_preventivo_proxima_fecha'
+    ].forEach(campo => {
+        if (textoImportacion(fila[campo]) && !normalizarFechaImportacion(fila[campo])) {
+            errores.push(`${campo} invalida.`);
+        }
+    });
+
+    if (hayCamposImportacion(fila, 'vacuna_') && !(textoImportacion(fila.vacuna_nombre) || textoImportacion(fila.vacuna_codigo))) errores.push('La vacuna necesita nombre o codigo.');
+    if (hayCamposImportacion(fila, 'vacuna_') && !normalizarFechaImportacion(fila.vacuna_fecha)) errores.push('La vacuna necesita fecha valida.');
+    if (hayCamposImportacion(fila, 'desparasitante_interno_') && !(textoImportacion(fila.desparasitante_interno_nombre) || textoImportacion(fila.desparasitante_interno_codigo))) errores.push('El desparasitante interno necesita nombre o codigo.');
+    if (hayCamposImportacion(fila, 'desparasitante_interno_') && !normalizarFechaImportacion(fila.desparasitante_interno_fecha)) errores.push('El desparasitante interno necesita fecha valida.');
+    if (hayCamposImportacion(fila, 'desparasitante_externo_') && !(textoImportacion(fila.desparasitante_externo_nombre) || textoImportacion(fila.desparasitante_externo_codigo))) errores.push('El desparasitante externo necesita nombre o codigo.');
+    if (hayCamposImportacion(fila, 'desparasitante_externo_') && !normalizarFechaImportacion(fila.desparasitante_externo_fecha)) errores.push('El desparasitante externo necesita fecha valida.');
+    if (hayCamposImportacion(fila, 'control_preventivo_') && !normalizarFechaImportacion(fila.control_preventivo_fecha)) errores.push('El control preventivo necesita fecha valida.');
+
+    return {
+        errores,
+        datos: {
+            tutorNombre: textoImportacion(fila.tutor_nombre),
+            tutorTelefono: textoImportacion(fila.tutor_telefono),
+            tutorEmail,
+            tutorDireccion: textoImportacion(fila.tutor_direccion),
+            mascotaNombre: textoImportacion(fila.mascota_nombre),
+            especie,
+            raza: textoImportacion(fila.raza),
+            sexo,
+            color: textoImportacion(fila.color),
+            fechaNacimiento,
+            peso: pesoRaw ? Number(pesoRaw) : null,
+            observaciones: textoImportacion(fila.observaciones)
+        }
+    };
+}
+
+async function insertarPreventivosImportacion(client, mascotaId, fila, responsableDefault) {
+    let creados = 0;
+    const responsableVacuna = textoImportacion(fila.vacuna_responsable) || responsableDefault;
+    const vacunaNombre = textoImportacion(fila.vacuna_nombre) || textoImportacion(fila.vacuna_codigo);
+    if (vacunaNombre) {
+        await client.query(
+            `INSERT INTO vacunas (mascota_id, nombre, enfermedades, laboratorio, fecha_aplicacion, proxima_dosis, lote, responsable, responsable_id, observaciones, status, fecha_asistencia)
+             VALUES ($1, $2, '', '', $3, $4, $5, $6, NULL, $7, 'pendiente', NULL)`,
+            [
+                mascotaId,
+                vacunaNombre,
+                normalizarFechaImportacion(fila.vacuna_fecha),
+                normalizarFechaImportacion(fila.vacuna_proxima_fecha) || null,
+                textoImportacion(fila.vacuna_lote),
+                responsableVacuna,
+                textoImportacion(fila.vacuna_observaciones)
+            ]
+        );
+        creados++;
+    }
+
+    const internoNombre = textoImportacion(fila.desparasitante_interno_nombre) || textoImportacion(fila.desparasitante_interno_codigo);
+    if (internoNombre) {
+        await client.query(
+            `INSERT INTO desparasitaciones (mascota_id, tipo, producto, tipo_producto, rango_peso, parasitos_cubre, fecha_aplicacion, proxima_aplicacion, dosis, via, responsable, responsable_id, observaciones, status, fecha_asistencia)
+             VALUES ($1, 'interna', $2, 'tableta', '', '', $3, $4, '', 'Oral', $5, NULL, $6, 'pendiente', NULL)`,
+            [
+                mascotaId,
+                internoNombre,
+                normalizarFechaImportacion(fila.desparasitante_interno_fecha),
+                normalizarFechaImportacion(fila.desparasitante_interno_proxima_fecha) || null,
+                textoImportacion(fila.desparasitante_interno_responsable) || responsableDefault,
+                textoImportacion(fila.desparasitante_interno_observaciones)
+            ]
+        );
+        creados++;
+    }
+
+    const externoNombre = textoImportacion(fila.desparasitante_externo_nombre) || textoImportacion(fila.desparasitante_externo_codigo);
+    if (externoNombre) {
+        await client.query(
+            `INSERT INTO desparasitaciones (mascota_id, tipo, producto, tipo_producto, rango_peso, parasitos_cubre, fecha_aplicacion, proxima_aplicacion, dosis, via, responsable, responsable_id, observaciones, status, fecha_asistencia)
+             VALUES ($1, 'externa', $2, 'Control externo', '', '', $3, $4, '', '', $5, NULL, $6, 'pendiente', NULL)`,
+            [
+                mascotaId,
+                externoNombre,
+                normalizarFechaImportacion(fila.desparasitante_externo_fecha),
+                normalizarFechaImportacion(fila.desparasitante_externo_proxima_fecha) || null,
+                textoImportacion(fila.desparasitante_externo_responsable) || responsableDefault,
+                textoImportacion(fila.desparasitante_externo_observaciones)
+            ]
+        );
+        creados++;
+    }
+
+    const controlFecha = normalizarFechaImportacion(fila.control_preventivo_fecha);
+    if (controlFecha) {
+        await client.query(
+            `INSERT INTO controles (mascota_id, fecha, motivo, peso, temperatura, fc, fr, hallazgos, diagnostico, tratamiento, recomendaciones, proximo_control, responsable, responsable_id, status, fecha_asistencia)
+             VALUES ($1, $2, $3, NULL, NULL, NULL, NULL, '', '', '', $4, $5, $6, NULL, 'pendiente', NULL)`,
+            [
+                mascotaId,
+                controlFecha,
+                textoImportacion(fila.control_preventivo_nombre) || 'Control preventivo',
+                textoImportacion(fila.control_preventivo_observaciones),
+                normalizarFechaImportacion(fila.control_preventivo_proxima_fecha) || null,
+                textoImportacion(fila.control_preventivo_responsable) || responsableDefault
+            ]
+        );
+        creados++;
+    }
+
+    return creados;
+}
+
+app.post('/api/importacion/pacientes', authMiddleware, async (req, res) => {
+    const filas = Array.isArray(req.body.filas) ? req.body.filas : [];
+    if (filas.length === 0) {
+        return res.status(400).json({ error: 'No se recibieron filas para importar.' });
+    }
+    if (filas.length > 500) {
+        return res.status(400).json({ error: 'La importacion permite hasta 500 filas por lote.' });
+    }
+
+    const client = await db.pool.connect();
+    const resultados = [];
+    const resumen = {
+        pacientesCreados: 0,
+        registrosPreventivosCreados: 0,
+        filasOmitidas: 0,
+        errores: 0
+    };
+
+    try {
+        await client.query('BEGIN');
+        for (let i = 0; i < filas.length; i++) {
+            const fila = filas[i] || {};
+            const numeroFila = fila.numeroFila || i + 2;
+            const savepoint = `fila_importacion_${i}`;
+            await client.query(`SAVEPOINT ${savepoint}`);
+
+            try {
+                const validacion = validarFilaImportacionBackend(fila);
+                if (validacion.errores.length) {
+                    throw new Error(validacion.errores.join(' '));
+                }
+
+                const d = validacion.datos;
+                const duplicado = await client.query(
+                    `SELECT id, codigo
+                     FROM mascotas
+                     WHERE veterinaria_id = $1
+                       AND LOWER(TRIM(tutor_nombre)) = LOWER(TRIM($2))
+                       AND LOWER(TRIM(nombre)) = LOWER(TRIM($3))
+                       AND LOWER(TRIM(especie)) = LOWER(TRIM($4))
+                     LIMIT 1`,
+                    [req.veterinaria.id, d.tutorNombre, d.mascotaNombre, d.especie]
+                );
+                if (duplicado.rows.length > 0) {
+                    throw new Error(`Posible duplicado existente (${duplicado.rows[0].codigo}).`);
+                }
+
+                const codigoGenerado = await generarCodigoPacienteParaClinica(
+                    client,
+                    { id: req.veterinaria.id, iniciales: req.veterinaria.iniciales },
+                    d.especie
+                );
+                const insertMascota = await client.query(
+                    `INSERT INTO mascotas
+                     (codigo, veterinaria_iniciales, veterinaria_id, nombre, especie, raza, sexo, fecha_nacimiento, color, peso, foto_base64, tutor_nombre, tutor_telefono, tutor_email, tutor_direccion, observaciones, code_species, code_date, code_counter)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, '', $11, $12, $13, $14, $15, $16, $17, $18)
+                     RETURNING id, codigo`,
+                    [
+                        codigoGenerado.codigo,
+                        req.veterinaria.iniciales,
+                        req.veterinaria.id,
+                        d.mascotaNombre,
+                        d.especie,
+                        d.raza,
+                        d.sexo,
+                        d.fechaNacimiento,
+                        d.color,
+                        d.peso,
+                        d.tutorNombre,
+                        d.tutorTelefono,
+                        d.tutorEmail || null,
+                        d.tutorDireccion,
+                        d.observaciones,
+                        codigoGenerado.codeSpecies,
+                        codigoGenerado.codeDate,
+                        codigoGenerado.codeCounter
+                    ]
+                );
+
+                const mascotaId = insertMascota.rows[0].id;
+                const registros = await insertarPreventivosImportacion(
+                    client,
+                    mascotaId,
+                    fila,
+                    req.veterinaria.nombre || 'Clinica veterinaria'
+                );
+
+                resumen.pacientesCreados++;
+                resumen.registrosPreventivosCreados += registros;
+                resultados.push({
+                    numeroFila,
+                    estado: 'creada',
+                    codigo: insertMascota.rows[0].codigo,
+                    mensaje: `Paciente creado con ${registros} registros preventivos.`
+                });
+            } catch (err) {
+                await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+                resumen.filasOmitidas++;
+                resumen.errores++;
+                resultados.push({
+                    numeroFila,
+                    estado: 'omitida',
+                    codigo: '',
+                    mensaje: err.message
+                });
+            } finally {
+                await client.query(`RELEASE SAVEPOINT ${savepoint}`).catch(() => {});
+            }
+        }
+        await client.query('COMMIT');
+        res.status(201).json({ resumen, filas: resultados });
+    } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error(err);
+        res.status(500).json({ error: 'Error al importar pacientes.' });
+    } finally {
+        client.release();
+    }
+});
+
 /**
  * Registrar mascota (paciente)
  */
@@ -2331,7 +2635,13 @@ app.get('/api/public/mascotas/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const mResult = await db.query(`
-            SELECT m.*, v.nombre AS veterinaria_nombre, v.telefono AS veterinaria_telefono, v.direccion AS veterinaria_direccion, v.logo_base64 AS veterinaria_logo
+            SELECT m.*,
+                   v.nombre AS veterinaria_nombre,
+                   v.telefono AS veterinaria_telefono,
+                   v.email AS veterinaria_email,
+                   v.direccion AS veterinaria_direccion,
+                   v.propietario AS veterinaria_propietario,
+                   v.logo_base64 AS veterinaria_logo
             FROM mascotas m
             JOIN veterinarias v ON m.veterinaria_id = v.id
             WHERE m.id = $1
@@ -2424,7 +2734,9 @@ app.get('/api/public/mascotas/:id', async (req, res) => {
             veterinaria: {
                 nombre: row.veterinaria_nombre,
                 telefono: row.veterinaria_telefono || '',
+                email: row.veterinaria_email || '',
                 direccion: row.veterinaria_direccion || '',
+                propietario: row.veterinaria_propietario || '',
                 logo: row.veterinaria_logo || ''
             }
         });

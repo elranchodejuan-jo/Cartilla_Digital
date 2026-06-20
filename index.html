@@ -735,12 +735,26 @@
                     </div>
                     <p class="prepared-note">Las vacunas, desparasitaciones internas, externas y controles se registran desde la cartilla del paciente usando responsables del equipo veterinario.</p>
                 </div>
-                <div class="register-panel prepared-panel" data-register-panel="importar">
-                    <h3>Importar pacientes</h3>
-                    <div class="import-dropzone">
-                        <strong>Plantilla Excel pendiente</strong>
-                        <span>Diseno listo para carga futura desde .xlsx o .csv sin mezclar datos manuales.</span>
+                <div class="register-panel prepared-panel import-panel" data-register-panel="importar">
+                    <div class="import-panel-header">
+                        <div>
+                            <h3>Importar pacientes</h3>
+                            <p class="prepared-note">Carga pacientes desde CSV con validacion previa. Nada se guarda hasta confirmar la vista previa.</p>
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="btn-descargar-plantilla-importacion">Descargar plantilla CSV</button>
                     </div>
+                    <div class="import-dropzone" id="import-dropzone">
+                        <strong>Selecciona un archivo CSV</strong>
+                        <span>Usa la plantilla oficial. La primera version soporta CSV; XLSX queda documentado como pendiente.</span>
+                        <input type="file" id="import-file-input" class="form-control" accept=".csv,text/csv">
+                    </div>
+                    <div class="import-actions">
+                        <button type="button" class="btn btn-secondary" id="btn-cancelar-importacion" disabled>Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="btn-validar-importacion">Validar archivo</button>
+                        <button type="button" class="btn btn-primary" id="btn-confirmar-importacion" disabled>Confirmar importacion</button>
+                    </div>
+                    <div id="import-summary" class="import-summary" aria-live="polite"></div>
+                    <div id="import-preview" class="import-preview"></div>
                 </div>
             </div>
         </section>
@@ -787,10 +801,10 @@
                     <button class="btn btn-secondary no-print no-public" onclick="iniciarTransferenciaMascota()" aria-label="Enviar paciente por transferencia">
                         ⇄ Enviar por Transferencia
                     </button>
-                    <button class="btn btn-secondary no-print no-public" onclick="copiarEnlaceCartilla()" aria-label="Copiar link público de la cartilla">
+                    <button class="btn btn-secondary no-print tutor-action" onclick="copiarEnlaceCartilla()" aria-label="Copiar link público de la cartilla">
                         🔗 Copiar Enlace
                     </button>
-                    <button class="btn btn-secondary no-print no-public" onclick="compartirWhatsApp()" aria-label="Compartir cartilla clínica por WhatsApp">
+                    <button class="btn btn-secondary no-print tutor-action" onclick="compartirWhatsApp()" aria-label="Compartir cartilla clínica por WhatsApp">
                         💬 WhatsApp
                     </button>
                     <button class="btn btn-primary no-print" onclick="imprimirCartilla()" aria-label="Imprimir cartilla médica del paciente">
@@ -853,12 +867,20 @@
                                 <span class="cartilla-detail-val" id="cartilla-pet-edad">N/A</span>
                             </div>
                             <div class="cartilla-detail-item">
+                                <span class="cartilla-detail-lbl">Nacimiento:</span>
+                                <span class="cartilla-detail-val" id="cartilla-pet-nacimiento">N/A</span>
+                            </div>
+                            <div class="cartilla-detail-item">
                                 <span class="cartilla-detail-lbl">Color:</span>
                                 <span class="cartilla-detail-val" id="cartilla-pet-color">N/A</span>
                             </div>
                             <div class="cartilla-detail-item">
                                 <span class="cartilla-detail-lbl">Peso:</span>
                                 <span class="cartilla-detail-val" id="cartilla-pet-peso">N/A</span>
+                            </div>
+                            <div class="cartilla-detail-item">
+                                <span class="cartilla-detail-lbl">Esterilizado:</span>
+                                <span class="cartilla-detail-val" id="cartilla-pet-esterilizado">N/A</span>
                             </div>
                         </div>
                     </div>
@@ -910,7 +932,7 @@
                     <div class="clinical-section" id="cartilla-vacunas-section">
                         <div class="section-header">
                             <h3 class="section-title">💉 Vacunas e Inmunizaciones</h3>
-                            <button class="btn btn-secondary" onclick="abrirModal('vacuna')">➕ Agregar Vacuna</button>
+                            <button class="btn btn-secondary no-print no-public" onclick="abrirModal('vacuna')">➕ Agregar Vacuna</button>
                         </div>
                         <div class="table-container">
                             <table class="clinic-table">
@@ -937,7 +959,7 @@
                     <div class="clinical-section" id="cartilla-desparasitaciones-internas-section">
                         <div class="section-header">
                             <h3 class="section-title">🪱 Desparasitaciones Internas</h3>
-                            <button class="btn btn-secondary" onclick="abrirModal('desparasitacion-interna')">➕ Agregar Interna</button>
+                            <button class="btn btn-secondary no-print no-public" onclick="abrirModal('desparasitacion-interna')">➕ Agregar Interna</button>
                         </div>
                         <div class="table-container">
                             <table class="clinic-table">
@@ -965,7 +987,7 @@
                     <div class="clinical-section" id="cartilla-controles-externos-section">
                         <div class="section-header">
                             <h3 class="section-title">🕷️ Control Antiparasitario Externo</h3>
-                            <button class="btn btn-secondary" onclick="abrirModal('control-externo')">➕ Agregar Control Externo</button>
+                            <button class="btn btn-secondary no-print no-public" onclick="abrirModal('control-externo')">➕ Agregar Control Externo</button>
                         </div>
                         <div class="table-container">
                             <table class="clinic-table">
@@ -994,7 +1016,7 @@
                     <div class="clinical-section" id="cartilla-controles-section">
                         <div class="section-header">
                             <h3 class="section-title">📋 Historial Clínico Preventivo</h3>
-                            <button class="btn btn-secondary" onclick="abrirModal('control')">➕ Agregar Control</button>
+                            <button class="btn btn-secondary no-print no-public" onclick="abrirModal('control')">➕ Agregar Control</button>
                         </div>
                         <div id="cartilla-controles-timeline" class="timeline">
                             <!-- Dinámico -->
@@ -1733,6 +1755,7 @@
     <script src="js/razas.js"></script>
     <script src="js/fotos.js"></script>
     <script src="js/mascotas.js"></script>
+    <script src="js/importacion.js"></script>
     <script src="js/vacunas.js"></script>
     <script src="js/desparasitaciones.js"></script>
     <script src="js/controles.js"></script>
