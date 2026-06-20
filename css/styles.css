@@ -5518,19 +5518,20 @@ body.public-view #section-cartilla .clinic-table th {
 @media print {
     .cartilla-main-grid {
         display: grid !important;
-        grid-template-columns: 30% minmax(0, 70%) !important;
-        gap: 8mm !important;
+        grid-template-columns: 27% minmax(0, 73%) !important;
+        gap: 6mm !important;
         align-items: start !important;
     }
 
     .cartilla-side-col {
         width: 100% !important;
-        max-width: none !important;
+        max-width: 100% !important;
         min-width: 0 !important;
     }
 
     .cartilla-content-col {
         width: 100% !important;
+        max-width: 100% !important;
         min-width: 0 !important;
         overflow: visible !important;
     }
@@ -5555,12 +5556,13 @@ body.public-view #section-cartilla .clinic-table th {
     #qrcode,
     .qr-box,
     .qr-container {
-        width: 43mm !important;
+        width: 40mm !important;
         height: auto !important;
-        min-width: 43mm !important;
-        min-height: 43mm !important;
+        min-width: 0 !important;
+        min-height: 40mm !important;
         max-width: 100% !important;
         margin: 0 auto !important;
+        overflow: visible !important;
     }
 
     #qrcode canvas,
@@ -5571,11 +5573,74 @@ body.public-view #section-cartilla .clinic-table th {
     .qr-section img,
     .qr-container canvas,
     .qr-container img {
-        width: 35mm !important;
-        height: 35mm !important;
-        max-width: 35mm !important;
-        max-height: 35mm !important;
+        width: 32mm !important;
+        height: 32mm !important;
+        max-width: 32mm !important;
+        max-height: 32mm !important;
         image-rendering: pixelated;
+    }
+
+    .cartilla-section,
+    .record-section,
+    .vaccine-section,
+    .deworming-section,
+    .preventive-section,
+    .clinical-section,
+    .table-container,
+    .table-wrapper,
+    .records-table-wrapper,
+    .table-responsive,
+    .table-scroll,
+    .records-scroll,
+    .print-table-wrapper,
+    .scroll-table,
+    .responsive-table {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+        overflow-x: visible !important;
+    }
+
+    .table-container table,
+    .clinic-table,
+    table {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+    }
+
+    .clinic-table th,
+    .clinic-table td,
+    th,
+    td {
+        white-space: normal !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        font-size: 8px !important;
+        line-height: 1.25 !important;
+        padding: 3px 4px !important;
+    }
+
+    .record-card,
+    .vaccine-card,
+    .deworming-card,
+    .preventive-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+    }
+
+    .record-card *,
+    .vaccine-card *,
+    .deworming-card *,
+    .preventive-card * {
+        white-space: normal !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
     }
 
     .signature-card,
